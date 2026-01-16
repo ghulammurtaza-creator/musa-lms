@@ -3,14 +3,17 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { ActiveSession, getActiveSessions } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
-import { Users, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Users, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 
 export default function ActiveSessionsView() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState<number | null>(null);
+  const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
 
   const fetchSessions = async () => {
     try {
@@ -23,6 +26,75 @@ export default function ActiveSessionsView() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncParticipants = async (sessionId: number) => {
+    try {
+      setSyncing(sessionId);
+      const response = await fetch(`http://localhost:8000/api/sync/sessions/${sessionId}/participants`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`Success! ${data.message}\nCreated: ${data.logs_created}, Updated: ${data.logs_updated}`);
+        // Refresh sessions to show updated data
+        await fetchSessions();
+      } else {
+        alert(`Error: ${data.detail || 'Failed to sync participants'}`);
+      }
+    } catch (err) {
+      alert('Failed to sync participants: ' + err);
+      console.error(err);
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const sendWebhookEvent = async (sessionId: number, meetingId: string, eventType: 'join' | 'exit') => {
+    const userEmail = prompt(`Enter email address for ${eventType}:`);
+    if (!userEmail) return;
+
+    const roleInput = prompt('Enter role (teacher/student):')?.toLowerCase();
+    if (!roleInput || !['teacher', 'student'].includes(roleInput)) {
+      alert('Role must be either "teacher" or "student"');
+      return;
+    }
+
+    // Capitalize first letter for the API
+    const role = roleInput.charAt(0).toUpperCase() + roleInput.slice(1);
+
+    try {
+      setTestingWebhook(`${sessionId}-${eventType}`);
+      const response = await fetch('http://localhost:8000/api/webhook/google-meet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Secret': '99cda0a876930791b1b15d8163286cefc32273e47e9f52b95735fcd9363ffe12', // From .env
+        },
+        body: JSON.stringify({
+          meeting_id: meetingId,
+          event_type: eventType,
+          user_email: userEmail,
+          role: role,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`Success! Webhook sent: ${userEmail} ${eventType}ed the meeting`);
+        await fetchSessions();
+      } else {
+        alert(`Error: ${data.detail || 'Failed to send webhook'}`);
+      }
+    } catch (err) {
+      alert('Failed to send webhook: ' + err);
+      console.error(err);
+    } finally {
+      setTestingWebhook(null);
     }
   };
 
@@ -108,6 +180,32 @@ export default function ActiveSessionsView() {
                       <p className="text-sm text-muted-foreground">Started: {formatDateTime(session.start_time)}</p>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => sendWebhookEvent(session.session_id, session.meeting_id, 'join')}
+                        disabled={testingWebhook === `${session.session_id}-join`}
+                        className="bg-green-50 hover:bg-green-100"
+                      >
+                        {testingWebhook === `${session.session_id}-join` ? 'Sending...' : 'Test Join'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => sendWebhookEvent(session.session_id, session.meeting_id, 'exit')}
+                        disabled={testingWebhook === `${session.session_id}-exit`}
+                        className="bg-red-50 hover:bg-red-100"
+                      >
+                        {testingWebhook === `${session.session_id}-exit` ? 'Sending...' : 'Test Leave'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => syncParticipants(session.session_id)}
+                        disabled={syncing === session.session_id}
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${syncing === session.session_id ? 'animate-spin' : ''}`} />
+                        {syncing === session.session_id ? 'Syncing...' : 'Sync from Meet'}
+                      </Button>
                       <span className="inline-flex items-center gap-1 text-sm">
                         <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                         Live
@@ -115,42 +213,52 @@ export default function ActiveSessionsView() {
                     </div>
                   </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Participant</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Join Time</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {session.participants.map((participant, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">{participant.user_email}</TableCell>
-                          <TableCell>
-                            <span
-                              className={`inline-flex items-center px-2 py-1 rounded text-xs ${
-                                participant.role === 'Teacher'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-green-100 text-green-800'
-                              }`}
-                            >
-                              {participant.role}
-                            </span>
-                          </TableCell>
-                          <TableCell>{formatDateTime(participant.join_time)}</TableCell>
-                          <TableCell>
-                            {participant.is_active ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-gray-400" />
-                            )}
-                          </TableCell>
+                  {session.participants.length === 0 ? (
+                    <div className="text-center py-4 text-sm text-muted-foreground border rounded">
+                      No participants yet. Click &quot;Sync from Meet&quot; to fetch participants from Google Meet.
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email/ID</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Join Time</TableHead>
+                          <TableHead>Status</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {session.participants.map((participant, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">
+                              {participant.display_name || '-'}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{participant.user_email}</TableCell>
+                            <TableCell>
+                              <span
+                                className={`inline-flex items-center px-2 py-1 rounded text-xs ${
+                                  participant.role === 'Teacher'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-green-100 text-green-800'
+                                }`}
+                              >
+                                {participant.role}
+                              </span>
+                            </TableCell>
+                            <TableCell>{formatDateTime(participant.join_time)}</TableCell>
+                            <TableCell>
+                              {participant.is_active ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-gray-400" />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
               ))}
             </div>

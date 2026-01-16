@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import init_db
-from app.routers import families, students, teachers, webhook, monitoring
+from app.routers import families, students, teachers, webhook, monitoring, schedule, oauth, test_webhook, sync, test_attendance
+from app.services.meeting_monitor import start_monitoring, stop_monitoring
 
 settings = get_settings()
 
@@ -29,13 +30,28 @@ app.include_router(students.router, prefix="/api")
 app.include_router(teachers.router, prefix="/api")
 app.include_router(webhook.router, prefix="/api")
 app.include_router(monitoring.router, prefix="/api")
-
+app.include_router(oauth.router, prefix="/api")
+app.include_router(sync.router, prefix="/api")
+app.include_router(test_attendance.router)
+app.include_router(schedule.router)
+app.include_router(test_webhook.router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """Initialize database and start monitoring service"""
     await init_db()
     print("Database initialized successfully")
+    
+    # Start meeting monitoring service
+    start_monitoring()
+    print("Meeting monitoring service initialized")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop monitoring service on shutdown"""
+    stop_monitoring()
+    print("Meeting monitoring service stopped")
 
 
 @app.get("/")

@@ -6,7 +6,10 @@ import ActiveSessionsView from '@/components/ActiveSessionsView';
 import AttendanceLogsView from '@/components/AttendanceLogsView';
 import FinancialHubView from '@/components/FinancialHubView';
 import UserManagementView from '@/components/UserManagementView';
-import { GraduationCap, Activity, DollarSign, Users } from 'lucide-react';
+import ScheduleClassForm from '@/components/ScheduleClassForm';
+import ScheduledClassesList from '@/components/ScheduledClassesList';
+import { GoogleCalendarConnect } from '@/components/GoogleCalendarConnect';
+import { GraduationCap, Activity, DollarSign, Users, Calendar } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -27,10 +30,14 @@ export default function HomePage() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="monitoring" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="monitoring" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Real-time Monitoring
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Schedule Classes
             </TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -48,6 +55,14 @@ export default function HomePage() {
 
           <TabsContent value="monitoring">
             <ActiveSessionsView />
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <div className="space-y-8">
+              <GoogleCalendarConnect teacherEmail="adil@orinex.co.uk" />
+              <ScheduleClassForm />
+              <ScheduledClassesList userEmail="adil.gillani@stixor.com" userRole="teacher" />
+            </div>
           </TabsContent>
 
           <TabsContent value="logs">

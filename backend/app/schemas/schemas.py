@@ -115,7 +115,8 @@ class SessionResponse(SessionBase):
 # Attendance Log Schemas
 class AttendanceLogBase(BaseModel):
     session_id: int
-    user_email: EmailStr
+    user_email: str  # Can be email or Google user ID (users/xxxxx)
+    display_name: Optional[str] = None  # Display name from Google Meet
     role: UserRole
     join_time: datetime
 
@@ -135,7 +136,7 @@ class AttendanceLogResponse(AttendanceLogBase):
     teacher_id: Optional[int] = None
     student_id: Optional[int] = None
     exit_time: Optional[datetime] = None
-    duration_minutes: float
+    duration_minutes: Optional[float] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -150,6 +151,48 @@ class GoogleMeetEvent(BaseModel):
     event_type: str  # "join" or "exit"
     timestamp: datetime
     role: UserRole
+
+
+# Scheduled Class Schemas
+class ScheduledClassCreate(BaseModel):
+    teacher_email: EmailStr
+    student_emails: List[EmailStr]
+    subject: str = Field(..., min_length=1, max_length=255)
+    start_time: datetime
+    duration_minutes: int = Field(..., gt=0, le=480)  # Max 8 hours
+    description: Optional[str] = None
+
+
+class ScheduledClassUpdate(BaseModel):
+    start_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = Field(None, gt=0, le=480)
+    student_emails: Optional[List[EmailStr]] = None
+
+
+class ScheduledClassResponse(BaseModel):
+    id: int
+    teacher_id: int
+    subject: str
+    start_time: datetime
+    end_time: datetime
+    duration_minutes: int
+    google_meet_link: Optional[str] = None
+    google_meet_code: Optional[str] = None
+    is_active: bool
+    is_completed: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ScheduledClassWithDetails(ScheduledClassResponse):
+    teacher: "TeacherResponse"
+    students: List["StudentResponse"]
+    session: Optional["SessionResponse"] = None
+    
+    class Config:
+        from_attributes = True
 
 
 # Billing Schemas

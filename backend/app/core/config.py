@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -21,6 +22,13 @@ class Settings(BaseSettings):
     
     # CORS
     frontend_url: str = "http://localhost:3000"
+    backend_url: str = "http://localhost:8000"
+    
+    @field_validator('backend_url', 'frontend_url')
+    @classmethod
+    def strip_trailing_slash(cls, v: str) -> str:
+        """Remove trailing slash from URLs"""
+        return v.rstrip('/')
     
     class Config:
         env_file = ".env"

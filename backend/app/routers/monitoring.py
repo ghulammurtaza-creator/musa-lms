@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 from typing import List
@@ -11,8 +11,9 @@ from app.schemas.schemas import (
 )
 from app.services.duration_service import DurationCalculationEngine
 from app.services.billing_service import BillingService
+from app.services.meeting_monitor import get_monitor_service
 from sqlalchemy import select
-from app.models.models import AttendanceLog
+from app.models.models import AttendanceLog, ScheduledClass, Session
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
@@ -115,3 +116,98 @@ async def get_teacher_payroll(
     """
     payroll = await BillingService.calculate_teacher_payroll(db, teacher_id, year, month)
     return payroll
+
+
+@router.post("/sync-participants/{class_id}")
+async def sync_class_participants(
+    class_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually trigger participant data sync for a specific scheduled class.
+    Useful for forcing an update or testing the automated system.
+    """
+    # Get scheduled class with students relationship eagerly loaded
+    from sqlalchemy.orm import selectinload
+    
+    stmt = select(ScheduledClass).options(
+        selectinload(ScheduledClass.students)
+    ).where(ScheduledClass.id == class_id)
+    result = await db.execute(stmt)
+    scheduled_class = result.scalars().first()
+    
+    if not scheduled_class:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scheduled class {class_id} not found"
+        )
+    
+    if not scheduled_class.google_meet_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Class does not have a Google Meet code"
+        )
+    
+    if not scheduled_class.session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Class does not have an active session yet"
+        )
+    
+    # Get session
+    session_stmt = select(Session).where(Session.id == scheduled_class.session_id)
+    session_result = await db.execute(session_stmt)
+    session = session_result.scalars().first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {scheduled_class.session_id} not found"
+        )
+    
+    # Trigger sync
+    monitor_service = get_monitor_service()
+    await monitor_service.sync_participant_data(db, session, scheduled_class)
+    await db.commit()
+    
+    # Return updated attendance logs
+    attendance_stmt = select(AttendanceLog).where(
+        AttendanceLog.session_id == session.id
+    ).order_by(AttendanceLog.join_time)
+    attendance_result = await db.execute(attendance_stmt)
+    logs = attendance_result.scalars().all()
+    
+    return {
+        "message": "Participant data synced successfully",
+        "class_id": class_id,
+        "session_id": session.id,
+        "meet_code": scheduled_class.google_meet_code,
+        "attendance_logs": [
+            {
+                "id": log.id,
+                "user_email": log.user_email,
+                "role": log.role.value,
+                "join_time": log.join_time,
+                "exit_time": log.exit_time,
+                "duration_minutes": log.duration_minutes
+            }
+            for log in logs
+        ]
+    }
+
+
+@router.post("/sync-all-active")
+async def sync_all_active_participants(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually trigger participant data sync for all active classes.
+    This is the same operation that runs automatically every 3 minutes.
+    """
+    monitor_service = get_monitor_service()
+    await monitor_service.fetch_participant_data()
+    
+    return {
+        "message": "Triggered participant sync for all active classes",
+        "note": "This operation runs automatically every 3 minutes"
+    }

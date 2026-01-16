@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.config import get_settings
 from app.models.models import Session, Teacher, Student, AttendanceLog, UserRole
 from app.schemas.schemas import GoogleMeetEvent
 from app.services.duration_service import DurationCalculationEngine
 from app.services.ai_service import ai_service
+from app.services.google_meet_api import get_meet_service
 
 router = APIRouter(prefix="/webhook", tags=["Webhook"])
 settings = get_settings()
@@ -199,3 +200,125 @@ async def generate_session_summary(
         "summary": summary,
         "session_id": session_id
     }
+
+
+@router.post("/sessions/{session_id}/sync-participants")
+async def sync_meeting_participants(
+    session_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Sync actual participant data from Google Meet REST API.
+    Call this after a meeting ends to get real join/leave times.
+    Uses the official Google Meet API v2.
+    """
+    # Get session
+    session_stmt = select(Session).where(Session.id == session_id)
+    session_result = await db.execute(session_stmt)
+    session = session_result.scalars().first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session with id {session_id} not found"
+        )
+    
+    if not session.google_meet_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session does not have a Google Meet code"
+        )
+    
+    # Fetch actual participant data from Google Meet API
+    try:
+        meet_service = get_meet_service()
+        meet_service.authenticate()
+        
+        # Get participant data using the Meet API
+        participant_data = meet_service.get_meeting_participants(
+            meet_code=session.google_meet_code
+        )
+        
+        if not participant_data:
+            return {
+                "status": "no_data",
+                "message": "No participant data found. Meeting may not have started yet or no conference record exists."
+            }
+        
+        # Update attendance logs with real data
+        updated_count = 0
+        created_count = 0
+        
+        for participant in participant_data:
+            email = participant.get('email')
+            if not email:
+                continue  # Skip anonymous/phone users without email
+            
+            sessions = participant.get('sessions', [])
+            if not sessions:
+                continue
+            
+            # Process each session (in case they joined multiple times)
+            for session_data in sessions:
+                join_time = session_data.get('start_time')
+                leave_time = session_data.get('end_time')
+                duration_seconds = session_data.get('duration_seconds', 0)
+                
+                if not join_time or not leave_time:
+                    continue
+                
+                # Find existing attendance log or create new one
+                log_stmt = select(AttendanceLog).where(
+                    AttendanceLog.session_id == session_id,
+                    AttendanceLog.user_email == email,
+                    AttendanceLog.join_time >= join_time - timedelta(minutes=5),  # Allow some tolerance
+                    AttendanceLog.join_time <= join_time + timedelta(minutes=5)
+                ).order_by(AttendanceLog.join_time.desc())
+                
+                log_result = await db.execute(log_stmt)
+                attendance_log = log_result.scalars().first()
+                
+                if attendance_log:
+                    # Update existing log with real data
+                    attendance_log.join_time = join_time
+                    attendance_log.exit_time = leave_time
+                    attendance_log.duration_minutes = round(duration_seconds / 60, 2)
+                    updated_count += 1
+                    # Create new attendance log
+                    # Determine if teacher or student
+                    teacher_stmt = select(Teacher).where(Teacher.email == email)
+                    teacher_result = await db.execute(teacher_stmt)
+                    teacher = teacher_result.scalars().first()
+                    
+                    student_stmt = select(Student).where(Student.email == email)
+                    student_result = await db.execute(student_stmt)
+                    student = student_result.scalars().first()
+                    
+                    new_log = AttendanceLog(
+                        session_id=session_id,
+                        user_email=email,
+                        role=UserRole.TEACHER if teacher else UserRole.STUDENT,
+                        teacher_id=teacher.id if teacher else None,
+                        student_id=student.id if student else None,
+                        join_time=join_time,
+                        exit_time=leave_time,
+                        duration_minutes=round(duration_seconds / 60, 2)
+                    )
+                    db.add(new_log)
+                    created_count += 1
+        
+        await db.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Synced {len(participant_data)} participants",
+            "updated": updated_count,
+            "created": created_count,
+            "participants": participant_data
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error syncing participants: {str(e)}"
+        )

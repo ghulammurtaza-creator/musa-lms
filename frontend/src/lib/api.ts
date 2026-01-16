@@ -54,6 +54,7 @@ export interface AttendanceLog {
   id: number;
   session_id: number;
   user_email: string;
+  display_name?: string;
   role: 'Teacher' | 'Student';
   teacher_id?: number;
   student_id?: number;
@@ -66,6 +67,7 @@ export interface AttendanceLog {
 
 export interface ActiveSessionParticipant {
   user_email: string;
+  display_name?: string;
   role: 'Teacher' | 'Student';
   join_time: string;
   is_active: boolean;
