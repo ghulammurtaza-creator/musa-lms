@@ -17,6 +17,12 @@ htmlcov/
 .env
 .env.local
 
+# Google OAuth credentials (NEVER commit these!)
+backend/token.json
+backend/credentials.json
+token.json
+credentials.json
+
 # Frontend
 node_modules/
 .next/
