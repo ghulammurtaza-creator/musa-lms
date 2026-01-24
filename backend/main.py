@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import init_db
-from app.routers import families, students, teachers, webhook, monitoring, schedule, oauth, test_webhook, sync, test_attendance
+from app.routers import (
+    families, students, teachers, webhook, monitoring, schedule, oauth,
+    test_webhook, sync, test_attendance, auth, assignments, relationships
+)
 from app.services.meeting_monitor import start_monitoring, stop_monitoring
 
 settings = get_settings()
@@ -25,6 +28,9 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router)
+app.include_router(assignments.router)
+app.include_router(relationships.router)
 app.include_router(families.router, prefix="/api")
 app.include_router(students.router, prefix="/api")
 app.include_router(teachers.router, prefix="/api")

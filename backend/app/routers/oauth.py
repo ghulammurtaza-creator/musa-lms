@@ -12,7 +12,7 @@ import json
 import os
 
 from app.core.database import get_db
-from app.models.models import Teacher
+from app.models.models import Teacher, AuthUser
 from app.core.config import get_settings
 
 router = APIRouter(prefix="/oauth", tags=["OAuth"])
@@ -46,13 +46,18 @@ async def connect_google_calendar(
     Initiate Google Calendar OAuth flow for a teacher
     Returns authorization URL for frontend to redirect to
     """
-    # Verify teacher exists
+    # Verify teacher exists (check both Teacher and AuthUser tables)
     stmt = select(Teacher).where(Teacher.email == teacher_email)
     result = await db.execute(stmt)
     teacher = result.scalars().first()
     
+    # If not in Teacher table, check AuthUser table
     if not teacher:
-        raise HTTPException(status_code=404, detail="Teacher not found")
+        stmt_auth = select(AuthUser).where(AuthUser.email == teacher_email)
+        result_auth = await db.execute(stmt_auth)
+        auth_user = result_auth.scalars().first()
+        if not auth_user:
+            raise HTTPException(status_code=404, detail="User not found")
     
     # Create OAuth flow
     flow = Flow.from_client_config(

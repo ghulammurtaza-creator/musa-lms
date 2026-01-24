@@ -11,6 +11,18 @@ class UserRole(str, enum.Enum):
     STUDENT = "Student"
 
 
+class AuthUserRole(str, enum.Enum):
+    ADMIN = "admin"
+    TUTOR = "tutor"
+    STUDENT = "student"
+
+
+class AssignmentStatus(str, enum.Enum):
+    PENDING = "pending"
+    SUBMITTED = "submitted"
+    GRADED = "graded"
+
+
 class Family(Base):
     """Family model to group students for billing purposes"""
     __tablename__ = "families"
@@ -163,3 +175,89 @@ class ScheduledClass(Base):
     
     def __repr__(self):
         return f"<ScheduledClass {self.subject} - {self.start_time}>"
+
+
+# Association table for many-to-many relationship between Students and Tutors
+student_tutor = Table(
+    'student_tutor',
+    Base.metadata,
+    Column('student_id', Integer, ForeignKey('auth_users.id', ondelete='CASCADE'), primary_key=True),
+    Column('tutor_id', Integer, ForeignKey('auth_users.id', ondelete='CASCADE'), primary_key=True),
+    Column('assigned_at', DateTime(timezone=True), server_default=func.now())
+)
+
+
+class AuthUser(Base):
+    """Authentication user model with role-based access"""
+    __tablename__ = "auth_users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=False)
+    role = Column(SQLEnum(AuthUserRole, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    created_assignments = relationship("Assignment", back_populates="tutor", foreign_keys="Assignment.tutor_id")
+    assignment_submissions = relationship("AssignmentSubmission", back_populates="student", foreign_keys="AssignmentSubmission.student_id")
+    
+    # Many-to-many relationship for students and tutors
+    tutors = relationship(
+        "AuthUser",
+        secondary=student_tutor,
+        primaryjoin=id == student_tutor.c.student_id,
+        secondaryjoin=id == student_tutor.c.tutor_id,
+        backref="students"
+    )
+    
+    def __repr__(self):
+        return f"<AuthUser {self.email} - {self.role}>"
+
+
+class Assignment(Base):
+    """Assignment model created by tutors"""
+    __tablename__ = "assignments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tutor_id = Column(Integer, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    due_date = Column(DateTime(timezone=True), nullable=False)
+    total_points = Column(Integer, default=100)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    tutor = relationship("AuthUser", back_populates="created_assignments", foreign_keys=[tutor_id])
+    submissions = relationship("AssignmentSubmission", back_populates="assignment", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Assignment {self.title}>"
+
+
+class AssignmentSubmission(Base):
+    """Assignment submission model"""
+    __tablename__ = "assignment_submissions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False)
+    submission_text = Column(Text)
+    file_path = Column(String(500))  # Path to uploaded file
+    status = Column(SQLEnum(AssignmentStatus, values_callable=lambda obj: [e.value for e in obj]), default=AssignmentStatus.PENDING)
+    grade = Column(Integer)  # Grade out of total_points
+    feedback = Column(Text)
+    submitted_at = Column(DateTime(timezone=True))
+    graded_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    assignment = relationship("Assignment", back_populates="submissions")
+    student = relationship("AuthUser", back_populates="assignment_submissions", foreign_keys=[student_id])
+    
+    def __repr__(self):
+        return f"<AssignmentSubmission Assignment:{self.assignment_id} Student:{self.student_id} - {self.status}>"

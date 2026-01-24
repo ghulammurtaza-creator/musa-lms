@@ -7,10 +7,6 @@ const ScheduledClassesList = ({ userEmail, userRole = 'teacher' }) => {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('upcoming');
 
-  useEffect(() => {
-    fetchClasses();
-  }, [userEmail, userRole, filter]);
-
   const fetchClasses = async () => {
     setLoading(true);
     setError(null);
@@ -33,6 +29,10 @@ const ScheduledClassesList = ({ userEmail, userRole = 'teacher' }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchClasses();
+  }, [userEmail, userRole, filter]);
 
   const formatDateTime = (isoString) => {
     const date = new Date(isoString);

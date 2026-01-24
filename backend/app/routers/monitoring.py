@@ -7,7 +7,9 @@ from app.schemas.schemas import (
     ActiveSessionResponse, 
     FamilyBilling, 
     TeacherPayroll,
-    AttendanceLogResponse
+    AttendanceLogResponse,
+    UserSessionReport,
+    UserSessionDetail
 )
 from app.services.duration_service import DurationCalculationEngine
 from app.services.billing_service import BillingService
@@ -211,3 +213,87 @@ async def sync_all_active_participants(
         "message": "Triggered participant sync for all active classes",
         "note": "This operation runs automatically every 3 minutes"
     }
+
+
+@router.get("/user-sessions", response_model=List[UserSessionReport])
+async def get_user_sessions(
+    year: int = Query(..., description="Year for report (e.g., 2026)"),
+    month: int = Query(..., ge=1, le=12, description="Month for report (1-12)"),
+    role: str = Query(None, description="Filter by role: 'tutor' or 'student'"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all users with their session details for a specific month.
+    Returns tutors and students with their attendance logs.
+    """
+    from app.models.models import AuthUser, AuthUserRole
+    from datetime import datetime
+    from sqlalchemy import and_
+    
+    # Calculate date range for the month
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+    
+    # Build query for users
+    user_query = select(AuthUser)
+    
+    # Filter by role if specified
+    if role:
+        if role.lower() == 'tutor':
+            user_query = user_query.where(AuthUser.role == AuthUserRole.TUTOR)
+        elif role.lower() == 'student':
+            user_query = user_query.where(AuthUser.role == AuthUserRole.STUDENT)
+    else:
+        # Get both tutors and students
+        user_query = user_query.where(
+            AuthUser.role.in_([AuthUserRole.TUTOR, AuthUserRole.STUDENT])
+        )
+    
+    user_result = await db.execute(user_query)
+    users = user_result.scalars().all()
+    
+    user_reports = []
+    
+    for user in users:
+        # Get attendance logs for this user in the specified month
+        logs_query = select(AttendanceLog).where(
+            and_(
+                AttendanceLog.user_email == user.email,
+                AttendanceLog.join_time >= start_date,
+                AttendanceLog.join_time < end_date
+            )
+        ).order_by(AttendanceLog.join_time.desc())
+        
+        logs_result = await db.execute(logs_query)
+        logs = logs_result.scalars().all()
+        
+        # Calculate totals
+        total_sessions = len(logs)
+        total_minutes = sum(log.duration_minutes or 0 for log in logs)
+        
+        # Build session details
+        session_details = [
+            UserSessionDetail(
+                session_id=log.session_id,
+                join_time=log.join_time,
+                exit_time=log.exit_time,
+                duration_minutes=log.duration_minutes or 0
+            )
+            for log in logs
+        ]
+        
+        # Create user report
+        user_reports.append(UserSessionReport(
+            user_id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            role=user.role.value,
+            total_sessions=total_sessions,
+            total_minutes=total_minutes,
+            sessions=session_details
+        ))
+    
+    return user_reports

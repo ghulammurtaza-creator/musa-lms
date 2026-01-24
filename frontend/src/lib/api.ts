@@ -100,6 +100,13 @@ export interface FamilyBilling {
   billing_month: string;
 }
 
+export interface StudentPayrollItem {
+  student_id: number;
+  student_name: string;
+  student_email: string;
+  total_minutes: number;
+}
+
 export interface TeacherPayroll {
   teacher_id: number;
   teacher_name: string;
@@ -108,6 +115,24 @@ export interface TeacherPayroll {
   hourly_rate: number;
   total_amount: number;
   billing_month: string;
+  students: StudentPayrollItem[];
+}
+
+export interface UserSessionDetail {
+  session_id: number;
+  join_time: string;
+  exit_time?: string;
+  duration_minutes: number;
+}
+
+export interface UserSessionReport {
+  user_id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  total_sessions: number;
+  total_minutes: number;
+  sessions: UserSessionDetail[];
 }
 
 // API Functions
@@ -150,3 +175,7 @@ export const getTeachersPayroll = (year: number, month: number) =>
   api.get<TeacherPayroll[]>('/monitoring/payroll/teachers', { params: { year, month } });
 export const getTeacherPayroll = (teacherId: number, year: number, month: number) => 
   api.get<TeacherPayroll>(`/monitoring/payroll/teachers/${teacherId}`, { params: { year, month } });
+
+// User Session Reports
+export const getUserSessions = (year: number, month: number, role?: string) =>
+  api.get<UserSessionReport[]>('/monitoring/user-sessions', { params: { year, month, role } });
