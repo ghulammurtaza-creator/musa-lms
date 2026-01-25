@@ -1,7 +1,7 @@
 """update_attendance_logs_fkeys_to_auth_users
 
 Revision ID: d523c6dada02
-Revises: 8d3bf161d499
+Revises: 1ebbb37ef30c
 Create Date: 2026-01-24 17:48:09.652224
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'd523c6dada02'
-down_revision = '8d3bf161d499'
+down_revision = '1ebbb37ef30c'
 branch_labels = None
 depends_on = None
 
