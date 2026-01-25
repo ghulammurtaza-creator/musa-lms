@@ -1,7 +1,7 @@
 """update_sessions_to_use_auth_users
 
 Revision ID: 8d3bf161d499
-Revises: 2743bec5347f
+Revises: db5da8a25518
 Create Date: 2026-01-24 17:35:58.150392
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '8d3bf161d499'
-down_revision = '2743bec5347f'
+down_revision = 'db5da8a25518'
 branch_labels = None
 depends_on = None
 
