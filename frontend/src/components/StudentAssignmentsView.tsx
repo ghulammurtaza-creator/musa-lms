@@ -3,6 +3,8 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
 interface Assignment {
   id: number;
   tutor_id: number;
@@ -41,7 +43,7 @@ export default function StudentAssignmentsView() {
   // Move fetchSubmissions above useEffect and wrap in useCallback
   const fetchSubmissions = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/assignments/my-submissions', {
+      const response = await fetch('\/assignments/my-submissions', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -68,7 +70,7 @@ export default function StudentAssignmentsView() {
         formData.append('file', submissionFile);
       }
 
-      const response = await fetch(`http://localhost:8000/api/assignments/${assignmentId}/submit`, {
+      const response = await fetch(`\/assignments/${assignmentId}/submit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -248,3 +250,5 @@ export default function StudentAssignmentsView() {
     </div>
   );
 }
+
+

@@ -3,6 +3,8 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
 interface User {
   id: number;
   email: string;
@@ -24,10 +26,10 @@ export default function StudentTutorManagement() {
   const fetchAllUsers = useCallback(async () => {
     try {
       const [studentsRes, tutorsRes] = await Promise.all([
-        fetch('http://localhost:8000/api/auth/students', {
+        fetch('\/auth/students', {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
-        fetch('http://localhost:8000/api/auth/tutors', {
+        fetch('\/auth/tutors', {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
       ]);
@@ -50,7 +52,7 @@ export default function StudentTutorManagement() {
   const fetchRelationships = async (studentId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/relationships/student/${studentId}/tutors`,
+        `\/relationships/student/${studentId}/tutors`,
         {
           headers: { 'Authorization': `Bearer ${token}` },
         }
@@ -66,7 +68,7 @@ export default function StudentTutorManagement() {
     if (!selectedStudent || !selectedTutor) return;
 
     try {
-      const response = await fetch('http://localhost:8000/api/relationships/assign', {
+      const response = await fetch('\/relationships/assign', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -93,7 +95,7 @@ export default function StudentTutorManagement() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/relationships/unassign', {
+      const response = await fetch('\/relationships/unassign', {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -258,3 +260,5 @@ export default function StudentTutorManagement() {
     </div>
   );
 }
+
+

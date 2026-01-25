@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, Users, BookOpen, RefreshCw } from 'lucide-react';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
 const ScheduledClassesList = ({ userEmail, userRole = 'teacher' }) => {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ const ScheduledClassesList = ({ userEmail, userRole = 'teacher' }) => {
       const param = userRole === 'teacher' ? `teacher_email=${userEmail}` : `student_email=${userEmail}`;
       const upcomingParam = filter === 'upcoming' ? '&upcoming_only=true' : '&upcoming_only=false';
       
-      const response = await fetch(`http://localhost:8000/api/schedule/classes?${param}${upcomingParam}`);
+      const response = await fetch(`${API_BASE_URL}/schedule/classes?${param}${upcomingParam}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch classes');
@@ -214,3 +216,4 @@ const ScheduledClassesList = ({ userEmail, userRole = 'teacher' }) => {
 };
 
 export default ScheduledClassesList;
+

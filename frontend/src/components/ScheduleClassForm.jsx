@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, BookOpen, Plus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
 const ScheduleClassForm = () => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -62,7 +64,7 @@ const ScheduleClassForm = () => {
     setSuccess(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/schedule/class', {
+      const response = await fetch(`${API_BASE_URL}/schedule/class`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -288,3 +290,4 @@ const ScheduleClassForm = () => {
 };
 
 export default ScheduleClassForm;
+
