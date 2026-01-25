@@ -13,6 +13,7 @@ if [ "$RESET_DB" = "true" ]; then
     python -c "
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 import os
 import sys
 
@@ -25,12 +26,12 @@ async def reset_db():
     engine = create_async_engine(database_url, echo=False)
     async with engine.begin() as conn:
         # Drop alembic version table to reset migration state
-        await conn.execute('DROP TABLE IF EXISTS alembic_version CASCADE')
+        await conn.execute(text('DROP TABLE IF EXISTS alembic_version CASCADE'))
         # Drop all tables
-        await conn.execute('DROP SCHEMA public CASCADE')
-        await conn.execute('CREATE SCHEMA public')
-        await conn.execute('GRANT ALL ON SCHEMA public TO postgres')
-        await conn.execute('GRANT ALL ON SCHEMA public TO public')
+        await conn.execute(text('DROP SCHEMA public CASCADE'))
+        await conn.execute(text('CREATE SCHEMA public'))
+        await conn.execute(text('GRANT ALL ON SCHEMA public TO postgres'))
+        await conn.execute(text('GRANT ALL ON SCHEMA public TO public'))
     await engine.dispose()
     print('✅ Database reset complete')
 
