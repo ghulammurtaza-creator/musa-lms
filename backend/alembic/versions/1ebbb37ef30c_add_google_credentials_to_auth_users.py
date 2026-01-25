@@ -1,8 +1,8 @@
 """add_google_credentials_to_auth_users
 
 Revision ID: 1ebbb37ef30c
-Revises: add_auth_assignments
-Create Date: 2026-01-24 11:22:42.441987
+Revises: 2ccce4224876
+Create Date: 2026-01-25 08:30:00.000000
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '1ebbb37ef30c'
-down_revision = 'add_auth_assignments'
+down_revision = '2ccce4224876'
 branch_labels = None
 depends_on = None
 
