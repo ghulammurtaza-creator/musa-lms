@@ -13,11 +13,16 @@ if [ "$RESET_DB" = "true" ]; then
     python -c "
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
-from app.core.config import settings
+import os
 import sys
 
 async def reset_db():
-    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    database_url = os.getenv('DATABASE_URL')
+    if not database_url:
+        print('⚠️  DATABASE_URL not set')
+        sys.exit(1)
+    
+    engine = create_async_engine(database_url, echo=False)
     async with engine.begin() as conn:
         # Drop alembic version table to reset migration state
         await conn.execute('DROP TABLE IF EXISTS alembic_version CASCADE')
