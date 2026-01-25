@@ -7,6 +7,36 @@ echo "🚀 Starting Academy Management System Backend on Fly.io..."
 echo "⏳ Waiting for database connection..."
 sleep 3
 
+# Reset migration state if RESET_DB is true
+if [ "$RESET_DB" = "true" ]; then
+    echo "🔄 Resetting database (RESET_DB=true)..."
+    python -c "
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine
+from app.core.config import settings
+import sys
+
+async def reset_db():
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        # Drop alembic version table to reset migration state
+        await conn.execute('DROP TABLE IF EXISTS alembic_version CASCADE')
+        # Drop all tables
+        await conn.execute('DROP SCHEMA public CASCADE')
+        await conn.execute('CREATE SCHEMA public')
+        await conn.execute('GRANT ALL ON SCHEMA public TO postgres')
+        await conn.execute('GRANT ALL ON SCHEMA public TO public')
+    await engine.dispose()
+    print('✅ Database reset complete')
+
+try:
+    asyncio.run(reset_db())
+except Exception as e:
+    print(f'⚠️  Reset failed: {e}')
+    sys.exit(1)
+"
+fi
+
 # Run database migrations
 echo "📊 Running database migrations..."
 alembic upgrade head
