@@ -12,6 +12,7 @@ import {
   FileText, 
   BarChart3, 
   DollarSign,
+  Settings,
   Menu,
   X,
   LogOut
@@ -55,6 +56,7 @@ export default function DashboardLayout({
         { href: '/dashboard/logs', label: 'Attendance Logs', icon: FileText },
         { href: '/dashboard/reports', label: 'User Reports', icon: BarChart3 },
         { href: '/dashboard/financial', label: 'Financial Hub', icon: DollarSign },
+        { href: '/dashboard/settings', label: 'Settings', icon: Settings },
       ];
     } else if (user?.role === 'tutor') {
       return [

@@ -36,35 +36,43 @@ if [ ! -f .env ]; then
     read -p "Press Enter after updating .env file..." 
 fi
 
-echo "🚀 Starting services..."
+echo "🚀 Starting backend services (Database, API, MinIO)..."
+echo "   Frontend will need to be started separately with: npm run dev"
 echo ""
 
-# Start Docker Compose
-docker-compose up -d
+# Start Docker Compose (backend only)
+docker compose up -d
 
 echo ""
-echo "⏳ Waiting for services to be ready..."
+echo "⏳ Waiting for backend services to be ready..."
 sleep 10
 
 # Check if services are running
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     echo ""
-    echo "✅ All services are running!"
+    echo "✅ Backend services are running!"
     echo ""
-    echo "📍 Access points:"
-    echo "   Frontend Dashboard: http://localhost:3000"
+    echo "📍 Backend access points:"
     echo "   Backend API:        http://localhost:8000"
-    echo "   API Documentation:  http://localhost:8000/api/docs"
+    echo "   API Documentation:  http://localhost:8000/docs"
+    echo "   MinIO Console:      http://localhost:9001"
     echo ""
-    echo "📊 Check logs with:"
-    echo "   docker-compose logs -f"
+    echo "🎨 To start the frontend:"
+    echo "   1. Open a new terminal"
+    echo "   2. cd frontend"
+    echo "   3. npm install (first time only)"
+    echo "   4. npm run dev"
+    echo "   5. Visit http://localhost:3000"
     echo ""
-    echo "🛑 Stop services with:"
-    echo "   docker-compose down"
+    echo "📊 Check backend logs with:"
+    echo "   docker compose logs -f"
+    echo ""
+    echo "🛑 Stop backend services with:"
+    echo "   docker compose down"
     echo ""
     echo "Happy coding! 🎉"
 else
     echo ""
     echo "❌ Some services failed to start. Check logs with:"
-    echo "   docker-compose logs"
+    echo "   docker compose logs"
 fi

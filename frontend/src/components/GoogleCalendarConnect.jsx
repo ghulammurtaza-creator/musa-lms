@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Link as LinkIcon } from 'lucide-react';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
 export function GoogleCalendarConnect({ teacherEmail }) {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -18,7 +20,7 @@ export function GoogleCalendarConnect({ teacherEmail }) {
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:8000/api/oauth/status/${teacherEmail}`);
+      const response = await fetch(`${API_BASE_URL}/oauth/status/${teacherEmail}`);
       const data = await response.json();
       
       if (response.ok) {
@@ -39,7 +41,7 @@ export function GoogleCalendarConnect({ teacherEmail }) {
     setError(null);
     
     try {
-      const url = `http://localhost:8000/api/oauth/connect?teacher_email=${encodeURIComponent(teacherEmail)}`;
+      const url = `${API_BASE_URL}/oauth/connect?teacher_email=${encodeURIComponent(teacherEmail)}`;
       console.log('Fetching:', url);
       const response = await fetch(url);
       const data = await response.json();
@@ -69,7 +71,7 @@ export function GoogleCalendarConnect({ teacherEmail }) {
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:8000/api/oauth/disconnect/${teacherEmail}`, {
+      const response = await fetch(`${API_BASE_URL}/oauth/disconnect/${teacherEmail}`, {
         method: 'POST',
       });
       const data = await response.json();

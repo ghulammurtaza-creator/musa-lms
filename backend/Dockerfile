@@ -15,11 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make entrypoint script executable
-RUN chmod +x /app/docker-entrypoint.sh
+# Make entrypoint scripts executable
+RUN chmod +x /app/docker-entrypoint.sh /app/fly-entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Use fly-entrypoint for production (handles migrations)
+# For local development, docker-compose overrides this
+CMD ["/app/fly-entrypoint.sh"]

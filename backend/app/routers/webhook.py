@@ -4,7 +4,7 @@ from sqlalchemy import select
 from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.config import get_settings
-from app.models.models import Session, Teacher, Student, AttendanceLog, UserRole
+from app.models.models import Session, AuthUser, AuthUserRole, AttendanceLog, UserRole
 from app.schemas.schemas import GoogleMeetEvent
 from app.services.duration_service import DurationCalculationEngine
 from app.services.ai_service import ai_service
@@ -40,7 +40,10 @@ async def google_meet_webhook(
         # If session doesn't exist and it's a join event for a teacher, create the session
         if event.event_type == "join" and event.role == UserRole.TEACHER:
             # Find teacher by email
-            teacher_stmt = select(Teacher).where(Teacher.email == event.user_email)
+            teacher_stmt = select(AuthUser).where(
+                AuthUser.email == event.user_email,
+                AuthUser.role == AuthUserRole.TUTOR
+            )
             teacher_result = await db.execute(teacher_stmt)
             teacher = teacher_result.scalars().first()
             
@@ -71,13 +74,19 @@ async def google_meet_webhook(
         student_id = None
         
         if event.role == UserRole.TEACHER:
-            teacher_stmt = select(Teacher).where(Teacher.email == event.user_email)
+            teacher_stmt = select(AuthUser).where(
+                AuthUser.email == event.user_email,
+                AuthUser.role == AuthUserRole.TUTOR
+            )
             teacher_result = await db.execute(teacher_stmt)
             teacher = teacher_result.scalars().first()
             if teacher:
                 teacher_id = teacher.id
         elif event.role == UserRole.STUDENT:
-            student_stmt = select(Student).where(Student.email == event.user_email)
+            student_stmt = select(AuthUser).where(
+                AuthUser.email == event.user_email,
+                AuthUser.role == AuthUserRole.STUDENT
+            )
             student_result = await db.execute(student_stmt)
             student = student_result.scalars().first()
             if student:
@@ -159,7 +168,7 @@ async def generate_session_summary(
         summary = await ai_service.generate_lesson_summary(transcript)
     else:
         # Generate summary from session metadata
-        teacher_stmt = select(Teacher).where(Teacher.id == session.teacher_id)
+        teacher_stmt = select(AuthUser).where(AuthUser.id == session.teacher_id)
         teacher_result = await db.execute(teacher_stmt)
         teacher = teacher_result.scalars().first()
         
@@ -174,18 +183,18 @@ async def generate_session_summary(
         student_names = []
         for log in logs:
             if log.student_id:
-                student_stmt = select(Student).where(Student.id == log.student_id)
+                student_stmt = select(AuthUser).where(AuthUser.id == log.student_id)
                 student_result = await db.execute(student_stmt)
                 student = student_result.scalars().first()
                 if student:
-                    student_names.append(student.name)
+                    student_names.append(student.full_name)
         
         duration = 0
         if session.end_time:
             duration = (session.end_time - session.start_time).total_seconds() / 60
         
         summary = await ai_service.generate_session_notes(
-            teacher_name=teacher.name if teacher else "Unknown",
+            teacher_name=teacher.full_name if teacher else "Unknown",
             duration_minutes=duration,
             student_names=student_names
         )
@@ -284,13 +293,20 @@ async def sync_meeting_participants(
                     attendance_log.exit_time = leave_time
                     attendance_log.duration_minutes = round(duration_seconds / 60, 2)
                     updated_count += 1
+                else:
                     # Create new attendance log
                     # Determine if teacher or student
-                    teacher_stmt = select(Teacher).where(Teacher.email == email)
+                    teacher_stmt = select(AuthUser).where(
+                        AuthUser.email == email,
+                        AuthUser.role == AuthUserRole.TUTOR
+                    )
                     teacher_result = await db.execute(teacher_stmt)
                     teacher = teacher_result.scalars().first()
                     
-                    student_stmt = select(Student).where(Student.email == email)
+                    student_stmt = select(AuthUser).where(
+                        AuthUser.email == email,
+                        AuthUser.role == AuthUserRole.STUDENT
+                    )
                     student_result = await db.execute(student_stmt)
                     student = student_result.scalars().first()
                     

@@ -34,30 +34,47 @@ docker-compose logs -f
 
 ## 📋 Common Commands
 
-### Docker Management
+### Docker Management (Backend Only)
 ```bash
-# Start services
-docker-compose up -d
+# Start backend services (Database, API, MinIO)
+docker compose up
 
 # Stop services
-docker-compose down
+docker compose down
 
 # View logs
-docker-compose logs -f app  # Backend logs
-docker-compose logs -f web  # Frontend logs
-docker-compose logs -f db   # Database logs
+docker compose logs -f app  # Backend logs
+docker compose logs -f db   # Database logs
 
 # Restart a service
-docker-compose restart app
+docker compose restart app
 
 # Rebuild after code changes
-docker-compose up -d --build
+docker compose up --build
+```
+
+### Frontend Management
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies (first time)
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run production build
+npm run start
 ```
 
 ### Database Operations
 ```bash
 # Run migrations
-docker-compose exec app alembic upgrade head
+docker compose exec app alembic upgrade head
 
 # Create new migration
 docker-compose exec app alembic revision --autogenerate -m "Your message"

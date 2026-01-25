@@ -42,7 +42,7 @@ class Family(Base):
 
 
 class Student(Base):
-    """Student model with family relationship"""
+    """Student model with family relationship (DEPRECATED - use AuthUser instead)"""
     __tablename__ = "students"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -55,14 +55,14 @@ class Student(Base):
     
     # Relationships
     family = relationship("Family", back_populates="students")
-    attendance_logs = relationship("AttendanceLog", back_populates="student", cascade="all, delete-orphan")
+    # attendance_logs relationship removed - migrated to AuthUser
     
     def __repr__(self):
         return f"<Student {self.name} ({self.email})>"
 
 
 class Teacher(Base):
-    """Teacher model with subject specialties"""
+    """Teacher model with subject specialties (DEPRECATED - use AuthUser instead)"""
     __tablename__ = "teachers"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -74,10 +74,6 @@ class Teacher(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
-    sessions = relationship("Session", back_populates="teacher", cascade="all, delete-orphan")
-    attendance_logs = relationship("AttendanceLog", back_populates="teacher", cascade="all, delete-orphan")
-    
     def __repr__(self):
         return f"<Teacher {self.name} ({self.email})>"
 
@@ -88,7 +84,7 @@ class Session(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     meeting_id = Column(String(255), unique=True, nullable=False, index=True)
-    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True))
     ai_summary = Column(Text)
@@ -99,7 +95,7 @@ class Session(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    teacher = relationship("Teacher", back_populates="sessions")
+    teacher = relationship("AuthUser", foreign_keys=[teacher_id], backref="sessions")
     attendance_logs = relationship("AttendanceLog", back_populates="session", cascade="all, delete-orphan")
     
     def __repr__(self):
@@ -116,9 +112,9 @@ class AttendanceLog(Base):
     display_name = Column(String(255), nullable=True)  # Display name from Google Meet
     role = Column(SQLEnum(UserRole, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     
-    # Foreign keys for both Teacher and Student (one will be null)
-    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=True)
-    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=True)
+    # Foreign keys for both Teacher and Student (one will be null) - now points to auth_users
+    teacher_id = Column(Integer, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=True)
+    student_id = Column(Integer, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=True)
     
     join_time = Column(DateTime(timezone=True), nullable=False)
     exit_time = Column(DateTime(timezone=True))
@@ -128,8 +124,8 @@ class AttendanceLog(Base):
     
     # Relationships
     session = relationship("Session", back_populates="attendance_logs")
-    teacher = relationship("Teacher", back_populates="attendance_logs")
-    student = relationship("Student", back_populates="attendance_logs")
+    teacher = relationship("AuthUser", foreign_keys=[teacher_id])
+    student = relationship("AuthUser", foreign_keys=[student_id])
     
     def __repr__(self):
         return f"<AttendanceLog {self.user_email} - {self.role}: {self.duration_minutes}min>"
@@ -140,7 +136,7 @@ scheduled_class_students = Table(
     'scheduled_class_students',
     Base.metadata,
     Column('scheduled_class_id', Integer, ForeignKey('scheduled_classes.id', ondelete='CASCADE'), primary_key=True),
-    Column('student_id', Integer, ForeignKey('students.id', ondelete='CASCADE'), primary_key=True)
+    Column('student_id', Integer, ForeignKey('auth_users.id', ondelete='CASCADE'), primary_key=True)
 )
 
 
@@ -149,7 +145,7 @@ class ScheduledClass(Base):
     __tablename__ = "scheduled_classes"
     
     id = Column(Integer, primary_key=True, index=True)
-    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False)
     subject = Column(String(255), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
@@ -169,9 +165,9 @@ class ScheduledClass(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    teacher = relationship("Teacher", backref="scheduled_classes")
+    teacher = relationship("AuthUser", foreign_keys=[teacher_id], backref="taught_classes")
     session = relationship("Session", backref="scheduled_class")
-    students = relationship("Student", secondary=scheduled_class_students, backref="scheduled_classes")
+    students = relationship("AuthUser", secondary=scheduled_class_students, backref="enrolled_classes")
     
     def __repr__(self):
         return f"<ScheduledClass {self.subject} - {self.start_time}>"
@@ -199,6 +195,7 @@ class AuthUser(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    google_credentials = Column(Text, nullable=True)  # JSON string of Google OAuth credentials
     
     # Relationships
     created_assignments = relationship("Assignment", back_populates="tutor", foreign_keys="Assignment.tutor_id")

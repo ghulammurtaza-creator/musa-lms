@@ -83,20 +83,9 @@ services:
     networks:
       - academy_network
 
-  # Next.js Frontend
-  web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: academy_frontend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api
-    ports:
-      - "3000:3000"
-    depends_on:
-      - app
-    networks:
-      - academy_network
+  # Next.js Frontend - Removed (run with npm run dev)
+  # Frontend now runs locally outside Docker
+  # See frontend/.env.local for configuration
 
 volumes:
   postgres_data:

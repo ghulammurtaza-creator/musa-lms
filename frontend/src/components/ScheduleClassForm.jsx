@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, BookOpen, Plus, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ScheduleClassForm = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     teacher_email: '',
     student_emails: [''],
@@ -14,6 +16,13 @@ const ScheduleClassForm = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+
+  // Auto-fill teacher email from authenticated user
+  useEffect(() => {
+    if (user && user.email) {
+      setFormData(prev => ({ ...prev, teacher_email: user.email }));
+    }
+  }, [user]);
 
   const addStudentEmail = () => {
     setFormData({
@@ -125,18 +134,17 @@ const ScheduleClassForm = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Teacher Email */}
+          {/* Teacher Email - Auto-filled and read-only */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Teacher Email
+              Teacher Email (Auto-filled)
             </label>
             <input
               type="email"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="teacher@youracademy.com"
+              disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
               value={formData.teacher_email}
-              onChange={(e) => setFormData({ ...formData, teacher_email: e.target.value })}
             />
           </div>
 

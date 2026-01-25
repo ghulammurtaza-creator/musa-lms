@@ -13,7 +13,7 @@ import asyncio
 import json
 
 from app.core.database import AsyncSessionLocal
-from app.models.models import ScheduledClass, Session, AttendanceLog, Teacher, Student, UserRole
+from app.models.models import ScheduledClass, Session, AttendanceLog, AuthUser, AuthUserRole, UserRole
 from app.services.duration_service import DurationCalculationEngine
 from app.services.google_meet_api import GoogleMeetAPIService
 
@@ -237,14 +237,35 @@ class MeetingMonitorService:
         scheduled_class: ScheduledClass
     ):
         """
-        Fetch participant data from Google Meet API and sync with attendance logs
+        Fetch participant data from Google Meet API and sync with attendance logs.
+        Uses shared Google credentials (from admin) to fetch data for all teachers' meetings.
         """
-        meet_service = self._get_meet_service()
-        if not meet_service:
-            print("Google Meet API not available, skipping participant sync")
-            return
-        
         try:
+            # Get shared Google credentials from admin account
+            admin_stmt = select(AuthUser).where(
+                AuthUser.role == AuthUserRole.ADMIN,
+                AuthUser.google_credentials.isnot(None)
+            ).limit(1)
+            admin_result = await db.execute(admin_stmt)
+            admin = admin_result.scalars().first()
+            
+            if not admin:
+                # Fallback: try to get any tutor with credentials
+                tutor_stmt = select(AuthUser).where(
+                    AuthUser.role == AuthUserRole.TUTOR,
+                    AuthUser.google_credentials.isnot(None)
+                ).limit(1)
+                tutor_result = await db.execute(tutor_stmt)
+                admin = tutor_result.scalars().first()
+            
+            if not admin or not admin.google_credentials:
+                print("No shared Google credentials found. Admin must connect Google Calendar.")
+                return
+            
+            # Create Meet service with shared credentials
+            meet_service = GoogleMeetAPIService(credentials_dict=admin.google_credentials)
+            meet_service.authenticate()
+            
             # Fetch participants from Google Meet API
             participants = meet_service.get_meeting_participants(
                 meet_code=scheduled_class.google_meet_code
@@ -256,10 +277,23 @@ class MeetingMonitorService:
             
             print(f"Found {len(participants)} participants for meeting {scheduled_class.google_meet_code}")
             
-            # Get teacher
-            teacher_stmt = select(Teacher).where(Teacher.id == scheduled_class.teacher_id)
+            # Get teacher (from AuthUser with tutor role) - for matching attendance
+            teacher_stmt = select(AuthUser).where(
+                AuthUser.id == scheduled_class.teacher_id,
+                AuthUser.role == AuthUserRole.TUTOR
+            )
             teacher_result = await db.execute(teacher_stmt)
             teacher = teacher_result.scalars().first()
+            
+            # DEBUG: Print teacher and student names from database
+            if teacher:
+                print(f"📋 Teacher in DB: '{teacher.full_name}' (ID: {teacher.id})")
+            else:
+                print(f"⚠️ No teacher found for class {scheduled_class.id}")
+            
+            print(f"📋 Enrolled students ({len(scheduled_class.students)}):")
+            for student in scheduled_class.students:
+                print(f"   - '{student.full_name}' (ID: {student.id})")
             
             # Get existing attendance logs for this session
             attendance_stmt = select(AttendanceLog).where(
@@ -272,63 +306,46 @@ class MeetingMonitorService:
             for participant_data in participants:
                 email = participant_data.get('email')
                 display_name = participant_data.get('display_name', 'Unknown')
-                if not email:
+                if not email or not display_name:
                     continue
                 
-                # Determine if teacher or student
-                # Google Meet API returns user IDs (users/xxxxx) instead of emails
-                # So we need to match by display name if email doesn't match
-                is_teacher = False
-                matched_teacher = False
+                # Normalize for matching (lowercase, remove spaces and dots)
+                display_name_normalized = display_name.lower().replace(' ', '').replace('.', '')
+                print(f"Processing participant: '{display_name}'")
+                
+                # Check against enrolled students FIRST (priority)
                 matched_student = None
+                for student in scheduled_class.students:
+                    if student.full_name:
+                        student_name_normalized = student.full_name.lower().strip().replace(' ', '').replace('.', '')
+                        # Check if student name is contained in display name
+                        if student_name_normalized and student_name_normalized in display_name_normalized:
+                            matched_student = student
+                            print(f"✓ STUDENT match: '{display_name}' contains '{student.full_name}'")
+                            break
                 
-                if teacher:
-                    # Try matching by email first
-                    if email.lower() == teacher.email.lower():
-                        is_teacher = True
-                        matched_teacher = True
-                    # If email doesn't match (user ID case), try matching by display name
-                    elif display_name and teacher.name:
-                        teacher_name_normalized = teacher.name.lower().replace(' ', '')
-                        display_name_normalized = display_name.lower().replace(' ', '')
-                        if teacher_name_normalized in display_name_normalized:
-                            matched_teacher = True
-                
-                # Also check if matches any student (check even if teacher matched for ambiguity resolution)
-                if display_name:
-                    for student in scheduled_class.students:
-                        if student.name:
-                            student_name_normalized = student.name.lower().replace(' ', '')
-                            display_name_normalized = display_name.lower().replace(' ', '')
-                            if student_name_normalized in display_name_normalized:
-                                matched_student = student
-                                break
-                
-                # If both teacher and student match, prefer exact match or longer name
-                # This handles cases where "Adil" matches "Adil Fazal" and "AdilFazal" matches "Syed Adil Fazal"
-                if matched_teacher and matched_student:
-                    teacher_name_normalized = teacher.name.lower().replace(' ', '')
-                    student_name_normalized = matched_student.name.lower().replace(' ', '')
-                    display_name_normalized = display_name.lower().replace(' ', '')
-                    
-                    # Check for exact match first
-                    if teacher_name_normalized == display_name_normalized:
-                        is_teacher = True
-                        matched_student = None
-                    elif student_name_normalized == display_name_normalized:
-                        is_teacher = False
-                        matched_teacher = False
-                    # If no exact match, prefer longer name (more specific)
-                    elif len(student_name_normalized) > len(teacher_name_normalized):
-                        is_teacher = False
-                        matched_teacher = False
+                # If matched a student, assign as student
+                if matched_student:
+                    teacher_id = None
+                    student_id = matched_student.id
+                    role = UserRole.STUDENT
+                # Otherwise check against teacher (not a student, so check if teacher)
+                elif teacher and teacher.full_name:
+                    teacher_name_normalized = teacher.full_name.lower().strip().replace(' ', '').replace('.', '')
+                    # Check if teacher name is contained in display name
+                    if teacher_name_normalized and teacher_name_normalized in display_name_normalized:
+                        teacher_id = teacher.id
+                        student_id = None
+                        role = UserRole.TEACHER
+                        print(f"✓ TEACHER match: '{display_name}' contains '{teacher.full_name}'")
                     else:
-                        is_teacher = True
-                        matched_student = None
-                elif matched_teacher:
-                    is_teacher = True
-                elif matched_student:
-                    is_teacher = False
+                        # Not teacher, not student - skip (shared account user)
+                        print(f"⊘ No match: '{display_name}' - skipping")
+                        continue
+                else:
+                    # No teacher found - skip
+                    print(f"⊘ No match: '{display_name}' - skipping")
+                    continue
                 
                 # Get session data (use first/earliest session if multiple)
                 sessions = participant_data.get('sessions', [])
@@ -371,19 +388,7 @@ class MeetingMonitorService:
                     if total_duration_seconds > 0:
                         duration_minutes = round(total_duration_seconds / 60, 2)
                     
-                    # Find student or teacher ID
-                    teacher_id = None
-                    student_id = None
-                    role = UserRole.STUDENT
-                    
-                    if is_teacher:
-                        teacher_id = teacher.id
-                        role = UserRole.TEACHER
-                    elif matched_student:
-                        student_id = matched_student.id
-                        role = UserRole.STUDENT
-                    
-                    # Create attendance log
+                    # Create attendance log (role, teacher_id, student_id already set above)
                     attendance_log = AttendanceLog(
                         session_id=session.id,
                         user_email=email,

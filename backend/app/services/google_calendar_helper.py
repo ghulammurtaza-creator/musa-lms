@@ -59,6 +59,10 @@ def create_class_event(
     
     end_time = start_time + timedelta(minutes=duration_minutes)
     
+    # Build attendees list - add teacher as organizer/co-host first
+    attendees = [{'email': teacher_email, 'organizer': False, 'optional': False, 'responseStatus': 'accepted'}]
+    attendees.extend([{'email': email} for email in student_emails])
+    
     # Create event with Google Meet
     event = {
         'summary': f'{subject} - Online Class',
@@ -71,12 +75,20 @@ def create_class_event(
             'dateTime': end_time.isoformat(),
             'timeZone': 'UTC',
         },
-        'attendees': [{'email': email} for email in student_emails],
+        'attendees': attendees,
+        'guestsCanModify': True,  # Allow attendees to modify event
+        'guestsCanInviteOthers': True,  # Allow attendees to invite others
+        'guestsCanSeeOtherGuests': True,  # Allow attendees to see guest list
         'conferenceData': {
             'createRequest': {
                 'requestId': f'meet-{start_time.timestamp()}',
                 'conferenceSolutionKey': {'type': 'hangoutsMeet'}
-            }
+            },
+            'entryPoints': [{
+                'entryPointType': 'video',
+                'uri': '',
+                'label': ''
+            }],
         },
         'reminders': {
             'useDefault': False,

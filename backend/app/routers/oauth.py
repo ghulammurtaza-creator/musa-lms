@@ -12,7 +12,7 @@ import json
 import os
 
 from app.core.database import get_db
-from app.models.models import Teacher, AuthUser
+from app.models.models import Teacher, AuthUser, AuthUserRole, AuthUserRole
 from app.core.config import get_settings
 
 router = APIRouter(prefix="/oauth", tags=["OAuth"])
@@ -46,18 +46,17 @@ async def connect_google_calendar(
     Initiate Google Calendar OAuth flow for a teacher
     Returns authorization URL for frontend to redirect to
     """
-    # Verify teacher exists (check both Teacher and AuthUser tables)
-    stmt = select(Teacher).where(Teacher.email == teacher_email)
-    result = await db.execute(stmt)
-    teacher = result.scalars().first()
+    # First check AuthUser table (primary authentication)
+    stmt_auth = select(AuthUser).where(AuthUser.email == teacher_email)
+    result_auth = await db.execute(stmt_auth)
+    auth_user = result_auth.scalars().first()
     
-    # If not in Teacher table, check AuthUser table
-    if not teacher:
-        stmt_auth = select(AuthUser).where(AuthUser.email == teacher_email)
-        result_auth = await db.execute(stmt_auth)
-        auth_user = result_auth.scalars().first()
-        if not auth_user:
-            raise HTTPException(status_code=404, detail="User not found")
+    if not auth_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify user is admin (only admin can connect shared Google Calendar)
+    if auth_user.role != AuthUserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admin can connect Google Calendar for shared use")
     
     # Create OAuth flow
     flow = Flow.from_client_config(
@@ -95,21 +94,24 @@ async def oauth_callback(
     error = request.query_params.get('error')
     
     if error:
-        # Redirect to frontend with error
+        # Redirect to frontend settings page with error
         return RedirectResponse(
-            url=f"{settings.frontend_url}/?oauth_error={error}"
+            url=f"{settings.frontend_url}/dashboard/settings?oauth_error={error}"
         )
     
     if not code or not teacher_email:
         raise HTTPException(status_code=400, detail="Missing code or state")
     
-    # Get teacher from database
-    stmt = select(Teacher).where(Teacher.email == teacher_email)
+    # Get teacher/tutor from AuthUser database
+    stmt = select(AuthUser).where(AuthUser.email == teacher_email)
     result = await db.execute(stmt)
-    teacher = result.scalars().first()
+    auth_user = result.scalars().first()
     
-    if not teacher:
+    if not auth_user:
         raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    if auth_user.role != AuthUserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admin can connect Google Calendar for shared use")
     
     try:
         # Exchange code for tokens
@@ -132,24 +134,24 @@ async def oauth_callback(
             'scopes': credentials.scopes
         }
         
-        # Update teacher with Google credentials
+        # Update auth_user with Google credentials
         update_stmt = (
-            update(Teacher)
-            .where(Teacher.email == teacher_email)
+            update(AuthUser)
+            .where(AuthUser.email == teacher_email)
             .values(google_credentials=json.dumps(credentials_dict))
         )
         await db.execute(update_stmt)
         await db.commit()
         
-        # Redirect to frontend with success
+        # Redirect to frontend settings page with success
         return RedirectResponse(
-            url=f"{settings.frontend_url}/?oauth_success=true"
+            url=f"{settings.frontend_url}/dashboard/settings?oauth_success=true"
         )
         
     except Exception as e:
         print(f"OAuth error: {str(e)}")
         return RedirectResponse(
-            url=f"{settings.frontend_url}/?oauth_error=authentication_failed"
+            url=f"{settings.frontend_url}/dashboard/settings?oauth_error=authentication_failed"
         )
 
 
@@ -161,14 +163,14 @@ async def get_oauth_status(
     """
     Check if teacher has connected Google Calendar
     """
-    stmt = select(Teacher).where(Teacher.email == teacher_email)
+    stmt = select(AuthUser).where(AuthUser.email == teacher_email)
     result = await db.execute(stmt)
-    teacher = result.scalars().first()
+    auth_user = result.scalars().first()
     
-    if not teacher:
+    if not auth_user:
         raise HTTPException(status_code=404, detail="Teacher not found")
     
-    has_credentials = bool(teacher.google_credentials)
+    has_credentials = bool(auth_user.google_credentials)
     
     return {
         "connected": has_credentials,
@@ -184,17 +186,17 @@ async def disconnect_google_calendar(
     """
     Disconnect teacher's Google Calendar
     """
-    stmt = select(Teacher).where(Teacher.email == teacher_email)
+    stmt = select(AuthUser).where(AuthUser.email == teacher_email)
     result = await db.execute(stmt)
-    teacher = result.scalars().first()
+    auth_user = result.scalars().first()
     
-    if not teacher:
+    if not auth_user:
         raise HTTPException(status_code=404, detail="Teacher not found")
     
     # Remove credentials
     update_stmt = (
-        update(Teacher)
-        .where(Teacher.email == teacher_email)
+        update(AuthUser)
+        .where(AuthUser.email == teacher_email)
         .values(google_credentials=None)
     )
     await db.execute(update_stmt)

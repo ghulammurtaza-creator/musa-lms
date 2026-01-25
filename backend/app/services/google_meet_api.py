@@ -21,14 +21,16 @@ MEET_API_DISCOVERY_URL = 'https://meet.googleapis.com/$discovery/rest?version=v2
 class GoogleMeetAPIService:
     """Service for fetching actual Google Meet participant data using Meet API v2"""
     
-    def __init__(self, token_path: str = None):
+    def __init__(self, token_path: str = None, credentials_dict: dict = None):
         """
         Initialize the Google Meet API service
         
         Args:
-            token_path: Path to OAuth2 token with Meet API scope
+            token_path: Path to OAuth2 token with Meet API scope (legacy, for fallback)
+            credentials_dict: Dictionary with OAuth credentials from auth_users.google_credentials
         """
         self.token_path = token_path or os.getenv('GOOGLE_TOKEN_PATH', 'token.json')
+        self.credentials_dict = credentials_dict
         self.creds = None
         self.service = None
     
@@ -40,7 +42,14 @@ class GoogleMeetAPIService:
             bool: True if authentication successful
         """
         try:
-            if os.path.exists(self.token_path):
+            # Prefer credentials_dict (per-teacher) over token.json (global)
+            if self.credentials_dict:
+                import json
+                # If it's a string, parse it as JSON
+                if isinstance(self.credentials_dict, str):
+                    self.credentials_dict = json.loads(self.credentials_dict)
+                self.creds = Credentials.from_authorized_user_info(self.credentials_dict, [MEET_API_SCOPE])
+            elif os.path.exists(self.token_path):
                 self.creds = Credentials.from_authorized_user_file(self.token_path, [MEET_API_SCOPE])
             
             if not self.creds or not self.creds.valid:
@@ -48,8 +57,8 @@ class GoogleMeetAPIService:
                     self.creds.refresh(Request())
                 else:
                     raise Exception(
-                        "No valid credentials found. You need to re-authenticate with Meet API scope. "
-                        "Run: python setup_google_oauth.py --meet"
+                        "No valid credentials found. Teacher needs to connect Google Calendar first. "
+                        "Go to Settings -> Connect Google Calendar"
                     )
             
             # Fetch the discovery document

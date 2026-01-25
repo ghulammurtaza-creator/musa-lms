@@ -8,7 +8,7 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_db
-from app.models.models import ScheduledClass, Teacher, Student, Session
+from app.models.models import ScheduledClass, Teacher, Student, Session, AuthUser, AuthUserRole
 from app.schemas.schemas import (
     ScheduledClassCreate,
     ScheduledClassUpdate,
@@ -21,6 +21,41 @@ from app.services.google_calendar_helper import create_class_event, update_class
 router = APIRouter(prefix="/api/schedule", tags=["scheduling"])
 
 
+async def get_shared_google_credentials(db: AsyncSession) -> dict:
+    """
+    Get shared Google credentials from a service account (admin user).
+    This allows using one paid Google Workspace account for all teachers.
+    
+    Returns the google_credentials JSON from the admin account.
+    """
+    # Try to get admin account with google credentials
+    admin_stmt = select(AuthUser).where(
+        AuthUser.role == AuthUserRole.ADMIN,
+        AuthUser.google_credentials.isnot(None)
+    ).limit(1)
+    admin_result = await db.execute(admin_stmt)
+    admin = admin_result.scalars().first()
+    
+    if admin and admin.google_credentials:
+        return admin.google_credentials
+    
+    # If no admin, try to get any tutor with credentials (fallback)
+    tutor_stmt = select(AuthUser).where(
+        AuthUser.role == AuthUserRole.TUTOR,
+        AuthUser.google_credentials.isnot(None)
+    ).limit(1)
+    tutor_result = await db.execute(tutor_stmt)
+    tutor = tutor_result.scalars().first()
+    
+    if tutor and tutor.google_credentials:
+        return tutor.google_credentials
+    
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="No Google Calendar connection found. Admin must connect Google Calendar first."
+    )
+
+
 @router.post("/class", response_model=ScheduledClassResponse, status_code=status.HTTP_201_CREATED)
 async def schedule_class(
     class_data: ScheduledClassCreate,
@@ -29,16 +64,20 @@ async def schedule_class(
     """
     Schedule a new class with Google Calendar and Meet integration
     
+    Uses shared Google Workspace credentials (from admin account) to create meetings
+    for all teachers, reducing licensing costs while still tracking individual teachers.
+    
     Steps:
-    1. Validate teacher exists and has connected Google Calendar
+    1. Validate teacher exists (no OAuth required per teacher)
     2. Validate all students exist
-    3. Create Google Calendar event with Meet link
-    4. Store scheduled class in database
-    5. Return class details with Meet link
+    3. Get shared Google credentials
+    4. Create Google Calendar event with Meet link
+    5. Store scheduled class in database with correct teacher_id
+    6. Return class details with Meet link
     """
     
-    # 1. Get teacher and check OAuth connection
-    teacher_stmt = select(Teacher).where(Teacher.email == class_data.teacher_email)
+    # 1. Get teacher (check AuthUser table)
+    teacher_stmt = select(AuthUser).where(AuthUser.email == class_data.teacher_email)
     teacher_result = await db.execute(teacher_stmt)
     teacher = teacher_result.scalars().first()
     
@@ -48,16 +87,17 @@ async def schedule_class(
             detail=f"Teacher with email {class_data.teacher_email} not found"
         )
     
-    if not teacher.google_credentials:
+    # Verify user is a teacher/tutor
+    if teacher.role != AuthUserRole.TUTOR:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Teacher must connect Google Calendar first. Please use the 'Connect Google Calendar' button."
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only tutors can schedule classes"
         )
     
-    # 2. Validate all students exist
+    # 2. Validate all students exist (check AuthUser table)
     students = []
     for student_email in class_data.student_emails:
-        student_stmt = select(Student).where(Student.email == student_email)
+        student_stmt = select(AuthUser).where(AuthUser.email == student_email)
         student_result = await db.execute(student_stmt)
         student = student_result.scalars().first()
         
@@ -66,13 +106,23 @@ async def schedule_class(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Student with email {student_email} not found"
             )
+        
+        # Verify user is a student
+        if student.role != AuthUserRole.STUDENT:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{student_email} is not a student"
+            )
         students.append(student)
     
-    # 3. Create Google Calendar event with Meet using teacher's credentials
+    # 3. Get shared Google credentials (from admin/service account)
+    shared_credentials = await get_shared_google_credentials(db)
+    
+    # 4. Create Google Calendar event with Meet using shared credentials
     try:
         event_data = create_class_event(
-            teacher_credentials_json=teacher.google_credentials,
-            teacher_email=class_data.teacher_email,
+            teacher_credentials_json=shared_credentials,
+            teacher_email=class_data.teacher_email,  # Still shows correct teacher in meeting
             student_emails=class_data.student_emails,
             subject=class_data.subject,
             start_time=class_data.start_time,
@@ -154,7 +204,7 @@ async def get_scheduled_classes(
     
     # Filter by teacher
     if teacher_email:
-        teacher_stmt = select(Teacher).where(Teacher.email == teacher_email)
+        teacher_stmt = select(AuthUser).where(AuthUser.email == teacher_email)
         teacher_result = await db.execute(teacher_stmt)
         teacher = teacher_result.scalars().first()
         if teacher:
@@ -162,7 +212,7 @@ async def get_scheduled_classes(
     
     # Filter by student
     if student_email:
-        student_stmt = select(Student).where(Student.email == student_email)
+        student_stmt = select(AuthUser).where(AuthUser.email == student_email)
         student_result = await db.execute(student_stmt)
         student = student_result.scalars().first()
         if student:
