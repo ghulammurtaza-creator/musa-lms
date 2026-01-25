@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from app.models.models import AttendanceLog, Session, Student, Teacher, UserRole
+from app.models.models import AttendanceLog, Session, AuthUser, AuthUserRole, UserRole
 
 
 class DurationCalculationEngine:
@@ -216,7 +216,7 @@ class DurationCalculationEngine:
             logs = logs_result.scalars().all()
             
             # Get teacher info
-            teacher_stmt = select(Teacher).where(Teacher.id == session.teacher_id)
+            teacher_stmt = select(AuthUser).where(AuthUser.id == session.teacher_id)
             teacher_result = await db.execute(teacher_stmt)
             teacher = teacher_result.scalars().first()
             
@@ -232,7 +232,7 @@ class DurationCalculationEngine:
             active_sessions.append({
                 'session_id': session.id,
                 'meeting_id': session.meeting_id,
-                'teacher_name': teacher.name if teacher else 'Unknown',
+                'teacher_name': teacher.full_name if teacher else 'Unknown',
                 'start_time': session.start_time,
                 'participants': participants
             })

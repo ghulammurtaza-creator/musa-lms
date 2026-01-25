@@ -3,7 +3,7 @@ from sqlalchemy import select, and_, func
 from datetime import datetime
 from typing import List
 from app.models.models import Family, Student, Teacher, AttendanceLog
-from app.schemas.schemas import FamilyBilling, StudentBillingItem, TeacherPayroll
+from app.schemas.schemas import FamilyBilling, StudentBillingItem, TeacherPayroll, StudentPayrollItem
 from app.services.duration_service import DurationCalculationEngine
 
 
@@ -108,6 +108,7 @@ class BillingService:
     ) -> TeacherPayroll:
         """
         Calculate payroll for a specific teacher for a given month.
+        Includes per-student breakdown.
         """
         # Get teacher details
         teacher_stmt = select(Teacher).where(Teacher.id == teacher_id)
@@ -122,6 +123,38 @@ class BillingService:
             db, teacher_id, year, month
         )
         
+        # Get per-student breakdown
+        # Find all students this teacher taught in the given month
+        start_date = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1)
+        else:
+            end_date = datetime(year, month + 1, 1)
+        
+        # Query attendance logs to get unique students
+        student_logs_stmt = select(AttendanceLog.student_id, Student.name, Student.email, func.sum(AttendanceLog.duration_minutes).label('total_minutes')).join(
+            Student, AttendanceLog.student_id == Student.id
+        ).where(
+            and_(
+                AttendanceLog.teacher_id == teacher_id,
+                AttendanceLog.join_time >= start_date,
+                AttendanceLog.join_time < end_date,
+                AttendanceLog.student_id.isnot(None)
+            )
+        ).group_by(AttendanceLog.student_id, Student.name, Student.email)
+        
+        student_result = await db.execute(student_logs_stmt)
+        student_rows = student_result.all()
+        
+        student_payroll_items = []
+        for student_id, student_name, student_email, minutes in student_rows:
+            student_payroll_items.append(StudentPayrollItem(
+                student_id=student_id,
+                student_name=student_name,
+                student_email=student_email,
+                total_minutes=float(minutes or 0)
+            ))
+        
         # Calculate payroll amount (convert minutes to hours)
         total_hours = total_minutes / 60
         total_amount = total_hours * teacher.hourly_rate
@@ -135,7 +168,8 @@ class BillingService:
             total_minutes=total_minutes,
             hourly_rate=teacher.hourly_rate,
             total_amount=round(total_amount, 2),
-            billing_month=billing_month
+            billing_month=billing_month,
+            students=student_payroll_items
         )
     
     @staticmethod

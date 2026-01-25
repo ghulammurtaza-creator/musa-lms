@@ -6,11 +6,11 @@ services:
     image: postgres:15-alpine
     container_name: academy_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: academy_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-academy_db}
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,17 +28,29 @@ services:
       dockerfile: Dockerfile
     container_name: academy_backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/academy_db
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-academy_db}
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_WEBHOOK_SECRET: ${GOOGLE_WEBHOOK_SECRET}
+      GOOGLE_WEBHOOK_SECRET: ${GOOGLE_WEBHOOK_SECRET:-default-webhook-secret}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      FRONTEND_URL: http://localhost:3000
-    ports:
-      - "8000:8000"
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
+      # Admin user creation (set CREATE_ADMIN=true to auto-create)
+      CREATE_ADMIN: ${CREATE_ADMIN:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_NAME: ${ADMIN_NAME:-System Administrator}
+      # MinIO Configuration
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-academy-assignments}
+      MINIO_SECURE: "false"
+    expose:
+      - "8000"
     depends_on:
       db:
         condition: service_healthy
@@ -48,37 +60,37 @@ services:
     #   - ./backend:/app
     networks:
       - academy_network
-    command: >
-      sh -c "
-        echo 'Waiting for database...' &&
-        sleep 5 &&
-        alembic upgrade head &&
-        uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-      "
+    entrypoint: ["/app/fly-entrypoint.sh"]
 
-  # Next.js Frontend
-  web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: academy_frontend
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: academy_minio
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api
-    ports:
-      - "3000:3000"
-    depends_on:
-      - app
-    # Removed volumes - using built image instead of live mounting
-    # For development, uncomment these and change Dockerfile to dev mode:
-    # volumes:
-    #   - ./frontend:/app
-    #   - /app/node_modules
-    #   - /app/.next
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    expose:
+      - "9000"
+      - "9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
     networks:
       - academy_network
 
+  # Next.js Frontend - Removed (run with npm run dev)
+  # Frontend now runs locally outside Docker
+  # See frontend/.env.local for configuration
+
 volumes:
   postgres_data:
+    driver: local
+  minio_data:
     driver: local
 
 networks:

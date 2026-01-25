@@ -36,6 +36,59 @@ export default function FinancialHubView() {
   const totalTeacherPayroll = teacherPayrolls.reduce((sum, tp) => sum + tp.total_amount, 0);
   const netRevenue = totalFamilyBilling - totalTeacherPayroll;
 
+  // CSV Export for Family Billing
+  const exportFamilyBilling = () => {
+    const csvRows = [
+      ['Family #', 'Parent Name', 'Parent Email', 'Student Name', 'Student Email', 'Total Hours', 'Hourly Rate', 'Amount']
+    ];
+    familyBillings.forEach(billing => {
+      billing.students.forEach(student => {
+        csvRows.push([
+          billing.family_number,
+          billing.parent_name,
+          billing.parent_email,
+          student.student_name,
+          student.student_email,
+          formatDuration(student.total_minutes),
+          student.hourly_rate.toString(),
+          formatCurrency(student.total_amount)
+        ]);
+      });
+    });
+    const csvContent = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `family_billing_${selectedYear}_${selectedMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // CSV Export for Teacher Payroll
+  const exportTeacherPayroll = () => {
+    const csvRows = [
+      ['Teacher Name', 'Email', 'Total Hours', 'Hourly Rate', 'Total Amount']
+    ];
+    teacherPayrolls.forEach(payroll => {
+      csvRows.push([
+        payroll.teacher_name,
+        payroll.teacher_email,
+        formatDuration(payroll.total_minutes),
+        payroll.hourly_rate.toString(),
+        formatCurrency(payroll.total_amount)
+      ]);
+    });
+    const csvContent = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `teacher_payroll_${selectedYear}_${selectedMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -126,7 +179,7 @@ export default function FinancialHubView() {
                   <CardTitle>Family Billing</CardTitle>
                   <CardDescription>Consolidated billing by family for the selected month</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={exportFamilyBilling}>
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
@@ -172,6 +225,12 @@ export default function FinancialHubView() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={5} className="text-right font-bold">Total:</TableCell>
+                      <TableCell className="text-right font-bold text-lg">
+                        {formatCurrency(totalFamilyBilling)}
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               )}
@@ -185,7 +244,7 @@ export default function FinancialHubView() {
                   <CardTitle>Teacher Payroll</CardTitle>
                   <CardDescription>Payroll summary for all teachers for the selected month</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={exportTeacherPayroll}>
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
@@ -200,6 +259,7 @@ export default function FinancialHubView() {
                     <TableRow>
                       <TableHead>Teacher Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Students Taught</TableHead>
                       <TableHead>Total Hours</TableHead>
                       <TableHead>Hourly Rate</TableHead>
                       <TableHead className="text-right">Total Amount</TableHead>
@@ -210,6 +270,19 @@ export default function FinancialHubView() {
                       <TableRow key={payroll.teacher_id}>
                         <TableCell className="font-medium">{payroll.teacher_name}</TableCell>
                         <TableCell>{payroll.teacher_email}</TableCell>
+                        <TableCell>
+                          {payroll.students && payroll.students.length > 0 ? (
+                            <div className="space-y-1">
+                              {payroll.students.map(student => (
+                                <div key={student.student_id} className="text-sm">
+                                  {student.student_name} ({formatDuration(student.total_minutes)})
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">No students</span>
+                          )}
+                        </TableCell>
                         <TableCell>{formatDuration(payroll.total_minutes)}</TableCell>
                         <TableCell>{formatCurrency(payroll.hourly_rate)}/hr</TableCell>
                         <TableCell className="text-right font-bold">
@@ -217,6 +290,12 @@ export default function FinancialHubView() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={5} className="text-right font-bold">Total:</TableCell>
+                      <TableCell className="text-right font-bold text-lg">
+                        {formatCurrency(totalTeacherPayroll)}
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               )}

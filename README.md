@@ -85,7 +85,9 @@ Musa LMS/
 - Git
 - (Optional) Node.js 20+ and Python 3.11+ for local development
 
-### Quick Start with Docker
+### Quick Start (Recommended Setup)
+
+**Backend runs in Docker, Frontend runs locally with npm**
 
 1. **Clone the repository**:
    ```bash
@@ -104,17 +106,29 @@ Musa LMS/
    - `GOOGLE_WEBHOOK_SECRET`: Secret for webhook authentication
    - `GEMINI_API_KEY`: Your Google Gemini API key
 
-3. **Start all services**:
+3. **Start backend services** (Database, API, MinIO):
    ```bash
-   docker-compose up -d
+   docker compose up
    ```
 
-4. **Access the application**:
+4. **In a new terminal, start the frontend**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+5. **Access the application**:
    - Frontend Dashboard: http://localhost:3000
    - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/api/docs
+   - API Documentation: http://localhost:8000/docs
+   - MinIO Console: http://localhost:9001
 
-### Local Development Setup
+**See [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) for detailed setup instructions.**
+
+### Alternative: Fully Local Development (Without Docker)
+
+If you prefer running everything locally without Docker:
 
 #### Backend Setup
 ```bash
@@ -127,9 +141,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy environment file
-cp .env.example .env
-# Edit .env with your configuration
+# Setup local PostgreSQL and update .env with your database URL
+# DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/academy_db
 
 # Run migrations
 alembic upgrade head
@@ -145,13 +158,14 @@ cd frontend
 # Install dependencies
 npm install
 
-# Copy environment file
-cp .env.local.example .env.local
-# Edit .env.local with your API URL
+# The .env.local file is already configured with:
+# NEXT_PUBLIC_API_URL=http://localhost:8000/api
 
 # Start development server
 npm run dev
 ```
+
+**Note**: The frontend `.env.local` file is already configured and ready to use.
 
 ## 🗄️ Database Schema
 
