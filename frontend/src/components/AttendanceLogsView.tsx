@@ -39,10 +39,10 @@ export default function AttendanceLogsView() {
       
       // Fetch tutors and students separately using their specific endpoints
       const [tutorsResponse, studentsResponse] = await Promise.all([
-        fetch('http://localhost:8000/api/auth/tutors', {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/tutors`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('http://localhost:8000/api/auth/students', {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/students`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);

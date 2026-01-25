@@ -32,7 +32,7 @@ export default function ActiveSessionsView() {
   const syncParticipants = async (sessionId: number) => {
     try {
       setSyncing(sessionId);
-      const response = await fetch(`http://localhost:8000/api/sync/sessions/${sessionId}/participants`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sync/sessions/${sessionId}/participants`, {
         method: 'POST',
       });
       const data = await response.json();
