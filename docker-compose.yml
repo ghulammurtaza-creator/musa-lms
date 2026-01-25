@@ -6,11 +6,11 @@ services:
     image: postgres:15-alpine
     container_name: academy_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: academy_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-academy_db}
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +28,7 @@ services:
       dockerfile: Dockerfile
     container_name: academy_backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/academy_db
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-academy_db}
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
@@ -36,7 +36,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_WEBHOOK_SECRET: ${GOOGLE_WEBHOOK_SECRET:-default-webhook-secret}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
       # Admin user creation (set CREATE_ADMIN=true to auto-create)
       CREATE_ADMIN: ${CREATE_ADMIN:-false}
@@ -45,33 +45,33 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-System Administrator}
       # MinIO Configuration
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin123
-      MINIO_BUCKET_NAME: academy-assignments
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-academy-assignments}
       MINIO_SECURE: "false"
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       db:
         condition: service_healthy
     # Removed volume for production - code is baked into image
     # For development, uncomment:
-    volumes:
-      - ./backend:/app
+    # volumes:
+    #   - ./backend:/app
     networks:
       - academy_network
-    entrypoint: ["/app/docker-entrypoint.sh"]
+    entrypoint: ["/app/fly-entrypoint.sh"]
 
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
     container_name: academy_minio
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    expose:
+      - "9000"
+      - "9001"
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
