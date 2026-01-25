@@ -9,7 +9,9 @@ sleep 3
 
 # Reset migration state if RESET_DB is true
 if [ "$RESET_DB" = "true" ]; then
-    echo "🔄 Resetting database (RESET_DB=true)..."
+    echo "🔄 Resetting database and migrations (RESET_DB=true)..."
+    
+    # Drop all tables and reset
     python -c "
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -23,24 +25,34 @@ async def reset_db():
         print('⚠️  DATABASE_URL not set')
         sys.exit(1)
     
-    engine = create_async_engine(database_url, echo=False)
-    async with engine.begin() as conn:
-        # Drop alembic version table to reset migration state
-        await conn.execute(text('DROP TABLE IF EXISTS alembic_version CASCADE'))
-        # Drop all tables
-        await conn.execute(text('DROP SCHEMA public CASCADE'))
-        await conn.execute(text('CREATE SCHEMA public'))
-        await conn.execute(text('GRANT ALL ON SCHEMA public TO postgres'))
-        await conn.execute(text('GRANT ALL ON SCHEMA public TO public'))
-    await engine.dispose()
-    print('✅ Database reset complete')
+    print('Connecting to database...')
+    engine = create_async_engine(database_url, echo=False, isolation_level='AUTOCOMMIT')
+    
+    try:
+        async with engine.connect() as conn:
+            print('Dropping all tables...')
+            # Drop schema and recreate
+            await conn.execute(text('DROP SCHEMA IF EXISTS public CASCADE'))
+            await conn.execute(text('CREATE SCHEMA public'))
+            await conn.execute(text('GRANT ALL ON SCHEMA public TO postgres'))
+            await conn.execute(text('GRANT ALL ON SCHEMA public TO public'))
+        print('✅ Database reset complete')
+    except Exception as e:
+        print(f'Error during reset: {e}')
+        raise
+    finally:
+        await engine.dispose()
 
 try:
     asyncio.run(reset_db())
 except Exception as e:
     print(f'⚠️  Reset failed: {e}')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
-"
+" || exit 1
+    
+    echo "✅ Database reset successful"
 fi
 
 # Run database migrations
