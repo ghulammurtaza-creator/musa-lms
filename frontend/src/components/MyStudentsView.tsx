@@ -20,7 +20,7 @@ export default function MyStudentsView() {
 
   const fetchStudents = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/relationships/my-students', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/relationships/my-students`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

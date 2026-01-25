@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Trash2, UserPlus, Users } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/config';
 
 interface AuthUser {
   id: number;
@@ -49,7 +50,7 @@ export default function AuthUserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/auth/users', {
+      const response = await fetch(`${API_BASE_URL}/auth/users`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -65,7 +66,7 @@ export default function AuthUserManagement() {
 
   const fetchFamilies = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/families');
+      const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/families`);
       if (response.ok) {
         const data = await response.json();
         setFamilies(data.data || data);
@@ -119,7 +120,7 @@ export default function AuthUserManagement() {
 
     try {
       // Step 1: Create auth user
-      const authResponse = await fetch('http://localhost:8000/api/auth/signup', {
+      const authResponse = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ export default function AuthUserManagement() {
 
       // Step 2: Create Student or Teacher record if needed
       if (formData.role === 'student') {
-        const studentResponse = await fetch('http://localhost:8000/api/students', {
+        const studentResponse = await fetch(`${API_BASE_URL.replace('/api', '')}/api/students`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -159,7 +160,7 @@ export default function AuthUserManagement() {
           console.error('Failed to create student record, but auth user was created');
         }
       } else if (formData.role === 'tutor') {
-        const teacherResponse = await fetch('http://localhost:8000/api/teachers', {
+        const teacherResponse = await fetch(`${API_BASE_URL.replace('/api', '')}/api/teachers`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -203,7 +204,7 @@ export default function AuthUserManagement() {
     setSuccess('');
 
     try {
-      const response = await fetch('http://localhost:8000/api/families', {
+      const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/families`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -235,7 +236,7 @@ export default function AuthUserManagement() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/auth/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/auth/users/${userId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
