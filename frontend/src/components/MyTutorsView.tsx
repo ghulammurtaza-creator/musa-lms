@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
 interface Tutor {
   id: number;
   email: string;
@@ -20,7 +22,7 @@ export default function MyTutorsView() {
 
   const fetchTutors = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/relationships/my-tutors', {
+      const response = await fetch('\/relationships/my-tutors', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -68,3 +70,5 @@ export default function MyTutorsView() {
     </div>
   );
 }
+
+

@@ -1,7 +1,7 @@
 """Add authentication and assignments tables
 
 Revision ID: add_auth_assignments
-Revises: 2ccce4224876
+Revises: add_google_credentials
 Create Date: 2026-01-23 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_auth_assignments'
-down_revision = '2ccce4224876'
+down_revision = 'add_google_credentials'
 branch_labels = None
 depends_on = None
 

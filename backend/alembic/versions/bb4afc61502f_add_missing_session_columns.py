@@ -1,8 +1,8 @@
 """add_missing_session_columns
 
 Revision ID: bb4afc61502f
-Revises: add_google_credentials
-Create Date: 2026-01-16 08:09:33.234029
+Revises: 8d3bf161d499
+Create Date: 2026-01-24 18:15:00.000000
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'bb4afc61502f'
-down_revision = 'add_google_credentials'
+down_revision = '8d3bf161d499'
 branch_labels = None
 depends_on = None
 
