@@ -3,6 +3,17 @@ set -e
 
 echo "🚀 Starting Academy Management System Backend on Fly.io..."
 
+# Check if DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ ERROR: DATABASE_URL environment variable is not set!"
+    echo "Please set DATABASE_URL secret in Fly.io dashboard"
+    exit 1
+else
+    # Show only the protocol and host (hide credentials)
+    DB_HOST=$(echo $DATABASE_URL | sed 's|.*@||' | sed 's|/.*||')
+    echo "✅ DATABASE_URL is set (connecting to: $DB_HOST)"
+fi
+
 # Database should already be ready (Fly.io managed Postgres)
 echo "⏳ Waiting for database connection..."
 sleep 3
