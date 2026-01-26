@@ -26,10 +26,10 @@ export default function StudentTutorManagement() {
   const fetchAllUsers = useCallback(async () => {
     try {
       const [studentsRes, tutorsRes] = await Promise.all([
-        fetch('\/auth/students', {
+        fetch(`${API_BASE_URL}/api/auth/students`, {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
-        fetch('\/auth/tutors', {
+        fetch(`${API_BASE_URL}/api/auth/tutors`, {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
       ]);
@@ -52,7 +52,7 @@ export default function StudentTutorManagement() {
   const fetchRelationships = async (studentId: number) => {
     try {
       const response = await fetch(
-        `\/relationships/student/${studentId}/tutors`,
+        `${API_BASE_URL}/api/relationships/student/${studentId}/tutors`,
         {
           headers: { 'Authorization': `Bearer ${token}` },
         }
@@ -68,7 +68,7 @@ export default function StudentTutorManagement() {
     if (!selectedStudent || !selectedTutor) return;
 
     try {
-      const response = await fetch('\/relationships/assign', {
+      const response = await fetch(`${API_BASE_URL}/api/relationships/assign`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -95,7 +95,7 @@ export default function StudentTutorManagement() {
     }
 
     try {
-      const response = await fetch('\/relationships/unassign', {
+      const response = await fetch(`${API_BASE_URL}/api/relationships/unassign`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
