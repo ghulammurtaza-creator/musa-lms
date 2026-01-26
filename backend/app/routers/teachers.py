@@ -9,7 +9,7 @@ from app.schemas.schemas import TeacherCreate, TeacherUpdate, TeacherResponse
 router = APIRouter(prefix="/teachers", tags=["Teachers"])
 
 
-@router.post("/", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
 async def create_teacher(
     teacher_data: TeacherCreate,
     db: AsyncSession = Depends(get_db)
@@ -31,7 +31,7 @@ async def create_teacher(
     return teacher
 
 
-@router.get("/", response_model=List[TeacherResponse])
+@router.get("", response_model=List[TeacherResponse])
 async def get_all_teachers(
     skip: int = 0,
     limit: int = 100,

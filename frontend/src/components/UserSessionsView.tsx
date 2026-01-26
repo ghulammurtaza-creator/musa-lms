@@ -5,31 +5,52 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { formatDuration } from '@/lib/utils';
-import { Users, Clock, Download, ArrowLeft } from 'lucide-react';
+import { Users, Clock, Download, ArrowLeft, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getUserSessions, UserSessionReport } from '@/lib/api';
+
+const ITEMS_PER_PAGE = 10;
 
 export default function UserSessionsView() {
   const [users, setUsers] = useState<UserSessionReport[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserSessionReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRole, setSelectedRole] = useState<'all' | 'tutor' | 'student'>('all');
 
   useEffect(() => {
     fetchUsers();
-  }, [selectedMonth]);
+  }, [selectedMonth, searchQuery, currentPage, selectedRole]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const [year, month] = selectedMonth.split('-');
-      const response = await getUserSessions(parseInt(year), parseInt(month));
+      const response = await getUserSessions(parseInt(year), parseInt(month), {
+        role: selectedRole === 'all' ? undefined : selectedRole,
+        search: searchQuery || undefined,
+        skip: (currentPage - 1) * ITEMS_PER_PAGE,
+        limit: ITEMS_PER_PAGE
+      });
       setUsers(response.data);
     } catch (err) {
       console.error('Failed to fetch user sessions:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1); // Reset to first page on new search
+  };
+
+  const handleRoleChange = (role: 'all' | 'tutor' | 'student') => {
+    setSelectedRole(role);
+    setCurrentPage(1); // Reset to first page on role change
   };
 
   const exportToCSV = () => {
@@ -62,9 +83,6 @@ export default function UserSessionsView() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const tutors = users.filter(u => u.role === 'tutor');
-  const students = users.filter(u => u.role === 'student');
 
   if (selectedUser) {
     return (
@@ -217,14 +235,58 @@ export default function UserSessionsView() {
           <CardDescription>View detailed session history for students and tutors</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Select Month</label>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 max-w-xs"
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Month</label>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Search Users</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <label className="text-sm font-medium">Filter by Role</label>
+            <div className="flex gap-2 mt-2">
+              <Button
+                variant={selectedRole === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleRoleChange('all')}
+              >
+                All
+              </Button>
+              <Button
+                variant={selectedRole === 'tutor' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleRoleChange('tutor')}
+              >
+                Tutors
+              </Button>
+              <Button
+                variant={selectedRole === 'student' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleRoleChange('student')}
+              >
+                Students
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -233,78 +295,74 @@ export default function UserSessionsView() {
         <div className="text-center py-12">
           <div className="text-xl text-muted-foreground">Loading users...</div>
         </div>
+      ) : users.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="text-muted-foreground">No users found</div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Tutors Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Tutors
-              </CardTitle>
-              <CardDescription>{tutors.length} tutor{tutors.length !== 1 ? 's' : ''}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tutors.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No tutors found</div>
-              ) : (
-                <div className="space-y-2">
-                  {tutors.map(tutor => (
-                    <div
-                      key={tutor.user_id}
-                      onClick={() => setSelectedUser(tutor)}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                    >
-                      <div>
-                        <div className="font-medium">{tutor.full_name}</div>
-                        <div className="text-sm text-muted-foreground">{tutor.email}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {tutor.total_sessions} sessions · {formatDuration(tutor.total_minutes)}
-                        </div>
+        <>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Display all users in a combined view */}
+            {users.map(user => (
+              <Card key={user.user_id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setSelectedUser(user)}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-lg">{user.full_name}</div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
+                      <div className="text-xs text-muted-foreground mt-2 flex items-center gap-4">
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {user.total_sessions} sessions
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDuration(user.total_minutes)}
+                        </span>
                       </div>
-                      <Badge variant="default">Tutor</Badge>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Badge variant={user.role === 'tutor' ? 'default' : 'secondary'}>
+                      {user.role}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-          {/* Students Section */}
+          {/* Pagination Controls */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Students
-              </CardTitle>
-              <CardDescription>{students.length} student{students.length !== 1 ? 's' : ''}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {students.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No students found</div>
-              ) : (
-                <div className="space-y-2">
-                  {students.map(student => (
-                    <div
-                      key={student.user_id}
-                      onClick={() => setSelectedUser(student)}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                    >
-                      <div>
-                        <div className="font-medium">{student.full_name}</div>
-                        <div className="text-sm text-muted-foreground">{student.email}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {student.total_sessions} sessions · {formatDuration(student.total_minutes)}
-                        </div>
-                      </div>
-                      <Badge variant="secondary">Student</Badge>
-                    </div>
-                  ))}
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage}
                 </div>
-              )}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={users.length < ITEMS_PER_PAGE}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </div>
+        </>
       )}
     </div>
   );

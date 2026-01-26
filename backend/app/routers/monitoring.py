@@ -220,15 +220,19 @@ async def get_user_sessions(
     year: int = Query(..., description="Year for report (e.g., 2026)"),
     month: int = Query(..., ge=1, le=12, description="Month for report (1-12)"),
     role: str = Query(None, description="Filter by role: 'tutor' or 'student'"),
+    search: str = Query(None, description="Search by name or email"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of records to return"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get all users with their session details for a specific month.
     Returns tutors and students with their attendance logs.
+    Supports pagination and search.
     """
     from app.models.models import AuthUser, AuthUserRole
     from datetime import datetime
-    from sqlalchemy import and_
+    from sqlalchemy import and_, or_
     
     # Calculate date range for the month
     start_date = datetime(year, month, 1)
@@ -251,6 +255,19 @@ async def get_user_sessions(
         user_query = user_query.where(
             AuthUser.role.in_([AuthUserRole.TUTOR, AuthUserRole.STUDENT])
         )
+    
+    # Add search filter if provided
+    if search:
+        search_pattern = f"%{search}%"
+        user_query = user_query.where(
+            or_(
+                AuthUser.full_name.ilike(search_pattern),
+                AuthUser.email.ilike(search_pattern)
+            )
+        )
+    
+    # Add pagination
+    user_query = user_query.offset(skip).limit(limit)
     
     user_result = await db.execute(user_query)
     users = user_result.scalars().all()
