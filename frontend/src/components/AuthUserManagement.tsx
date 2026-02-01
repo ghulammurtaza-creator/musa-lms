@@ -66,7 +66,7 @@ export default function AuthUserManagement() {
 
   const fetchFamilies = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/families`);
+      const response = await fetch(`${API_BASE_URL}/families`);
       if (response.ok) {
         const data = await response.json();
         setFamilies(data.data || data);
@@ -143,7 +143,7 @@ export default function AuthUserManagement() {
 
       // Step 2: Create Student or Teacher record if needed
       if (formData.role === 'student') {
-        const studentResponse = await fetch(`${API_BASE_URL.replace('/api', '')}/api/students`, {
+        const studentResponse = await fetch(`${API_BASE_URL}/students`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -160,7 +160,7 @@ export default function AuthUserManagement() {
           console.error('Failed to create student record, but auth user was created');
         }
       } else if (formData.role === 'tutor') {
-        const teacherResponse = await fetch(`${API_BASE_URL.replace('/api', '')}/api/teachers`, {
+        const teacherResponse = await fetch(`${API_BASE_URL}/teachers`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ export default function AuthUserManagement() {
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/families`, {
+      const response = await fetch(`${API_BASE_URL}/families`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -86,7 +86,7 @@ export default function TutorAssignmentsView() {
   }, [token]);
   const fetchStudents = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/students`, {
+      const response = await fetch(`${API_BASE_URL}/relationships/my-students`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
