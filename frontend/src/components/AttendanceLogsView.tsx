@@ -73,6 +73,9 @@ export default function AttendanceLogsView() {
     try {
       setLoading(true);
       const response = await getAttendanceLogs({ limit: 1000 });
+      console.log('Fetched attendance logs:', response.data);
+      console.log('Teacher logs:', response.data.filter(log => log.role === 'Teacher'));
+      console.log('Student logs:', response.data.filter(log => log.role === 'Student'));
       setLogs(response.data);
       setFilteredLogs(response.data);
     } catch (err) {
