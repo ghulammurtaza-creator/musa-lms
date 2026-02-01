@@ -9,13 +9,11 @@ from app.schemas.schemas import FamilyCreate, FamilyUpdate, FamilyResponse
 router = APIRouter(prefix="/families", tags=["Families"])
 
 
-@router.post("/", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED)
-@router.post("", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-async def create_family(
+async def _create_family(
     family_data: FamilyCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession
 ):
-    """Create a new family"""
+    """Create a new family - internal implementation"""
     # Check if family_number already exists
     stmt = select(Family).where(Family.family_number == family_data.family_number)
     result = await db.execute(stmt)
@@ -32,18 +30,54 @@ async def create_family(
     return family
 
 
+@router.post("/", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED)
+async def create_family_with_slash(
+    family_data: FamilyCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new family"""
+    return await _create_family(family_data, db)
+
+
+@router.post("", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+async def create_family_without_slash(
+    family_data: FamilyCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new family"""
+    return await _create_family(family_data, db)
+
+
+async def _get_all_families(
+    skip: int,
+    limit: int,
+    db: AsyncSession
+):
+    """Get all families - internal implementation"""
+    stmt = select(Family).offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    families = result.scalars().all()
+    return families
+
+
 @router.get("/", response_model=List[FamilyResponse])
-@router.get("", response_model=List[FamilyResponse], include_in_schema=False)
-async def get_all_families(
+async def get_all_families_with_slash(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db)
 ):
     """Get all families"""
-    stmt = select(Family).offset(skip).limit(limit)
-    result = await db.execute(stmt)
-    families = result.scalars().all()
-    return families
+    return await _get_all_families(skip, limit, db)
+
+
+@router.get("", response_model=List[FamilyResponse], include_in_schema=False)
+async def get_all_families_without_slash(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all families"""
+    return await _get_all_families(skip, limit, db)
 
 
 @router.get("/{family_id}", response_model=FamilyResponse)
