@@ -371,13 +371,18 @@ class MeetingMonitorService:
                         role = UserRole.TEACHER
                         print(f"✓ TEACHER match: '{display_name}' matched '{teacher.full_name}'")
                     else:
-                        # Not teacher, not student - skip (shared account user)
-                        print(f"⊘ No match: '{display_name}' - skipping")
-                        continue
+                        # Not teacher, not enrolled student - but still save as unmatched student
+                        # This handles cases where Google account name differs from database name
+                        print(f"⚠ No exact match for '{display_name}' - saving as unmatched student")
+                        teacher_id = None
+                        student_id = None  # No student_id since we couldn't match
+                        role = UserRole.STUDENT
                 else:
-                    # No teacher found - skip
-                    print(f"⊘ No match: '{display_name}' - skipping")
-                    continue
+                    # No teacher found - save as unmatched student anyway
+                    print(f"⚠ No teacher to check, '{display_name}' - saving as unmatched student")
+                    teacher_id = None
+                    student_id = None
+                    role = UserRole.STUDENT
                 
                 # Get session data (use first/earliest session if multiple)
                 sessions = participant_data.get('sessions', [])
