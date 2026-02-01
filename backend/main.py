@@ -16,7 +16,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    redirect_slashes=False
+    redirect_slashes=True
 )
 
 # Configure CORS - Allow all origins
