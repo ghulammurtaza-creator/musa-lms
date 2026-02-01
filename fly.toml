@@ -2,10 +2,6 @@
 app = "musa-lms-backend"
 primary_region = "iad" # Washington DC - change to your preferred region
 
-[build]
-  dockerfile = "backend/Dockerfile"
-  build_target = "backend"
-
 [env]
   # Application settings
   ALGORITHM = "HS256"

@@ -1,16 +1,26 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from pydantic import field_validator
+import os
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
-        extra="ignore"  # Ignore extra environment variables
+        extra="ignore",  # Ignore extra environment variables
+        case_sensitive=False  # Allow case-insensitive env vars
     )
     
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/academy_db"
+    
+    @field_validator('database_url', mode='before')
+    @classmethod
+    def fix_database_url(cls, v: str) -> str:
+        """Convert postgres:// to postgresql+asyncpg:// for Fly.io compatibility"""
+        if v and v.startswith('postgres://'):
+            v = v.replace('postgres://', 'postgresql+asyncpg://', 1)
+        return v
     
     # Security
     secret_key: str = "your-secret-key-change-in-production"

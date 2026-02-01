@@ -22,7 +22,7 @@ export default function MyTutorsView() {
 
   const fetchTutors = async () => {
     try {
-      const response = await fetch('\/relationships/my-tutors', {
+      const response = await fetch(`${API_BASE_URL}/relationships/my-tutors`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

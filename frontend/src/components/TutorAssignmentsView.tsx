@@ -71,7 +71,7 @@ export default function TutorAssignmentsView() {
   // Move fetchAssignments and fetchStudents above useEffect and wrap in useCallback
   const fetchAssignments = useCallback(async () => {
     try {
-      const response = await fetch('\/assignments', {
+      const response = await fetch(`${API_BASE_URL}/assignments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -86,7 +86,7 @@ export default function TutorAssignmentsView() {
   }, [token]);
   const fetchStudents = useCallback(async () => {
     try {
-      const response = await fetch('\/auth/students', {
+      const response = await fetch(`${API_BASE_URL}/auth/students`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -100,7 +100,7 @@ export default function TutorAssignmentsView() {
 
   const fetchSubmissions = useCallback(async (assignmentId: number) => {
     try {
-      const response = await fetch(`\/assignments/${assignmentId}/submissions`, {
+      const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/submissions`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -120,7 +120,7 @@ export default function TutorAssignmentsView() {
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('\/assignments', {
+      const response = await fetch(`${API_BASE_URL}/assignments`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -161,7 +161,7 @@ export default function TutorAssignmentsView() {
 
   const handleDownloadFile = async (submissionId: number) => {
     try {
-      const response = await fetch(`\/assignments/submissions/${submissionId}/download`, {
+      const response = await fetch(`${API_BASE_URL}/assignments/submissions/${submissionId}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -190,7 +190,7 @@ export default function TutorAssignmentsView() {
 
   const handleGradeSubmission = async (submissionId: number) => {
     try {
-      const response = await fetch(`\/assignments/submissions/${submissionId}/grade`, {
+      const response = await fetch(`${API_BASE_URL}/assignments/submissions/${submissionId}/grade`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
