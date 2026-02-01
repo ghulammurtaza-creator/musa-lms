@@ -276,13 +276,24 @@ async def get_user_sessions(
     
     for user in users:
         # Get attendance logs for this user in the specified month
-        logs_query = select(AttendanceLog).where(
-            and_(
-                AttendanceLog.user_email == user.email,
-                AttendanceLog.join_time >= start_date,
-                AttendanceLog.join_time < end_date
-            )
-        ).order_by(AttendanceLog.join_time.desc())
+        # Use teacher_id or student_id based on user role instead of email
+        # because user_email may contain Google user IDs like 'users/123456'
+        if user.role == AuthUserRole.TUTOR:
+            logs_query = select(AttendanceLog).where(
+                and_(
+                    AttendanceLog.teacher_id == user.id,
+                    AttendanceLog.join_time >= start_date,
+                    AttendanceLog.join_time < end_date
+                )
+            ).order_by(AttendanceLog.join_time.desc())
+        else:  # STUDENT
+            logs_query = select(AttendanceLog).where(
+                and_(
+                    AttendanceLog.student_id == user.id,
+                    AttendanceLog.join_time >= start_date,
+                    AttendanceLog.join_time < end_date
+                )
+            ).order_by(AttendanceLog.join_time.desc())
         
         logs_result = await db.execute(logs_query)
         logs = logs_result.scalars().all()
