@@ -138,9 +138,9 @@ export interface UserSessionReport {
 // API Functions
 
 // Families
-export const getFamilies = () => api.get<Family[]>('/families/');
+export const getFamilies = () => api.get<Family[]>('/families');
 export const getFamily = (id: number) => api.get<Family>(`/families/${id}`);
-export const createFamily = (data: Partial<Family>) => api.post<Family>('/families/', data);
+export const createFamily = (data: Partial<Family>) => api.post<Family>('/families', data);
 export const updateFamily = (id: number, data: Partial<Family>) => api.patch<Family>(`/families/${id}`, data);
 export const deleteFamily = (id: number) => api.delete(`/families/${id}`);
 

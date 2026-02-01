@@ -51,6 +51,7 @@ def create_admin_user():
             hashed_password=get_password_hash(password),
             full_name=full_name,
             role=AuthUserRole.ADMIN,
+            hourly_rate=0.0,  # Admin doesn't need hourly rate
             is_active=True
         )
         
@@ -88,6 +89,7 @@ def create_sample_users():
             hashed_password=get_password_hash("tutor123"),
             full_name="John Tutor",
             role=AuthUserRole.TUTOR,
+            hourly_rate=50.0,  # $50/hour for tutors
             is_active=True
         )
         db.add(tutor)
@@ -98,6 +100,7 @@ def create_sample_users():
             hashed_password=get_password_hash("student123"),
             full_name="Alice Student",
             role=AuthUserRole.STUDENT,
+            hourly_rate=40.0,  # $40/hour billing rate for students
             is_active=True
         )
         db.add(student1)
@@ -107,6 +110,7 @@ def create_sample_users():
             hashed_password=get_password_hash("student123"),
             full_name="Bob Student",
             role=AuthUserRole.STUDENT,
+            hourly_rate=40.0,  # $40/hour billing rate for students
             is_active=True
         )
         db.add(student2)

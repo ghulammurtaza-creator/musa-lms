@@ -11,6 +11,7 @@ interface User {
   full_name: string;
   role: 'admin' | 'tutor' | 'student';
   is_active: boolean;
+  hourly_rate: number;
   created_at: string;
 }
 
@@ -18,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, fullName: string, role: string) => Promise<void>;
+  signup: (email: string, password: string, fullName: string, role: string, hourlyRate?: number) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -128,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signup = async (email: string, password: string, fullName: string, role: string) => {
+  const signup = async (email: string, password: string, fullName: string, role: string, hourlyRate: number = 50.0) => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
@@ -140,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           full_name: fullName,
           role,
+          hourly_rate: hourlyRate,
         }),
       });
 
