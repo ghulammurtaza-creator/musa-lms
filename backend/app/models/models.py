@@ -193,6 +193,7 @@ class AuthUser(Base):
     full_name = Column(String(255), nullable=False)
     role = Column(SQLEnum(AuthUserRole, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     is_active = Column(Boolean, default=True)
+    hourly_rate = Column(Float, nullable=False, default=50.0)  # Hourly rate for billing/payroll
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     google_credentials = Column(Text, nullable=True)  # JSON string of Google OAuth credentials

@@ -273,6 +273,7 @@ class UserSignup(BaseModel):
     password: str = Field(..., min_length=6)
     full_name: str = Field(..., min_length=1, max_length=255)
     role: AuthUserRole
+    hourly_rate: float = Field(default=50.0, ge=0)  # Hourly rate for billing/payroll
 
 
 class UserLogin(BaseModel):
@@ -296,6 +297,7 @@ class AuthUserResponse(BaseModel):
     full_name: str
     role: AuthUserRole
     is_active: bool
+    hourly_rate: float = 50.0  # Default hourly rate for billing/payroll
     created_at: datetime
     
     class Config:

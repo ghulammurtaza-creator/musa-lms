@@ -45,6 +45,7 @@ async def signup(user_data: UserSignup, db: AsyncSession = Depends(get_db)):
         hashed_password=hashed_password,
         full_name=user_data.full_name,
         role=user_data.role,
+        hourly_rate=user_data.hourly_rate,
         is_active=True
     )
     
