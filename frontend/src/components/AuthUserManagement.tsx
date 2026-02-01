@@ -66,7 +66,7 @@ export default function AuthUserManagement() {
 
   const fetchFamilies = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/families`);
+      const response = await fetch(`${API_BASE_URL}/families/`);
       if (response.ok) {
         const data = await response.json();
         setFamilies(data.data || data);
@@ -204,7 +204,7 @@ export default function AuthUserManagement() {
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/families`, {
+      const response = await fetch(`${API_BASE_URL}/families/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
