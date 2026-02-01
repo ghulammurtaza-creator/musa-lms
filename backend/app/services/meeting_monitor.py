@@ -309,19 +309,53 @@ class MeetingMonitorService:
                 if not email or not display_name:
                     continue
                 
-                # Normalize for matching (lowercase, remove spaces and dots)
-                display_name_normalized = display_name.lower().replace(' ', '').replace('.', '')
                 print(f"Processing participant: '{display_name}'")
+                
+                # Helper function for flexible name matching
+                def names_match(db_name: str, meet_name: str) -> bool:
+                    """Check if names match using multiple strategies"""
+                    if not db_name or not meet_name:
+                        return False
+                    
+                    db_normalized = db_name.lower().strip().replace('.', '')
+                    meet_normalized = meet_name.lower().strip().replace('.', '')
+                    
+                    # Strategy 1: Full name contains (normalized without spaces)
+                    db_no_space = db_normalized.replace(' ', '')
+                    meet_no_space = meet_normalized.replace(' ', '')
+                    if db_no_space in meet_no_space or meet_no_space in db_no_space:
+                        return True
+                    
+                    # Strategy 2: Any word from DB name appears in Meet name (or vice versa)
+                    db_words = [w for w in db_normalized.split() if len(w) > 2]  # Skip short words like 'e'
+                    meet_words = [w for w in meet_normalized.split() if len(w) > 2]
+                    
+                    for db_word in db_words:
+                        if db_word in meet_normalized:
+                            return True
+                    for meet_word in meet_words:
+                        if meet_word in db_normalized:
+                            return True
+                    
+                    return False
                 
                 # Check against enrolled students FIRST (priority)
                 matched_student = None
-                for student in scheduled_class.students:
+                students_to_check = list(scheduled_class.students)
+                
+                # FALLBACK: If no students enrolled, check ALL students in the system
+                if not students_to_check:
+                    print("⚠️ No enrolled students - checking all students in database...")
+                    all_students_stmt = select(AuthUser).where(AuthUser.role == AuthUserRole.STUDENT)
+                    all_students_result = await db.execute(all_students_stmt)
+                    students_to_check = all_students_result.scalars().all()
+                    print(f"   Found {len(students_to_check)} students in database to check")
+                
+                for student in students_to_check:
                     if student.full_name:
-                        student_name_normalized = student.full_name.lower().strip().replace(' ', '').replace('.', '')
-                        # Check if student name is contained in display name
-                        if student_name_normalized and student_name_normalized in display_name_normalized:
+                        if names_match(student.full_name, display_name):
                             matched_student = student
-                            print(f"✓ STUDENT match: '{display_name}' contains '{student.full_name}'")
+                            print(f"✓ STUDENT match: '{display_name}' matched '{student.full_name}'")
                             break
                 
                 # If matched a student, assign as student
@@ -331,13 +365,11 @@ class MeetingMonitorService:
                     role = UserRole.STUDENT
                 # Otherwise check against teacher (not a student, so check if teacher)
                 elif teacher and teacher.full_name:
-                    teacher_name_normalized = teacher.full_name.lower().strip().replace(' ', '').replace('.', '')
-                    # Check if teacher name is contained in display name
-                    if teacher_name_normalized and teacher_name_normalized in display_name_normalized:
+                    if names_match(teacher.full_name, display_name):
                         teacher_id = teacher.id
                         student_id = None
                         role = UserRole.TEACHER
-                        print(f"✓ TEACHER match: '{display_name}' contains '{teacher.full_name}'")
+                        print(f"✓ TEACHER match: '{display_name}' matched '{teacher.full_name}'")
                     else:
                         # Not teacher, not student - skip (shared account user)
                         print(f"⊘ No match: '{display_name}' - skipping")
