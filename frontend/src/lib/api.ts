@@ -177,5 +177,23 @@ export const getTeacherPayroll = (teacherId: number, year: number, month: number
   api.get<TeacherPayroll>(`/monitoring/payroll/teachers/${teacherId}`, { params: { year, month } });
 
 // User Session Reports
-export const getUserSessions = (year: number, month: number, role?: string) =>
-  api.get<UserSessionReport[]>('/monitoring/user-sessions', { params: { year, month, role } });
+export const getUserSessions = (
+  year: number, 
+  month: number, 
+  options?: {
+    role?: string;
+    search?: string;
+    skip?: number;
+    limit?: number;
+  }
+) =>
+  api.get<UserSessionReport[]>('/monitoring/user-sessions', { 
+    params: { 
+      year, 
+      month, 
+      ...(options?.role && { role: options.role }),
+      ...(options?.search && { search: options.search }),
+      ...(options?.skip !== undefined && { skip: options.skip }),
+      ...(options?.limit !== undefined && { limit: options.limit })
+    } 
+  });
