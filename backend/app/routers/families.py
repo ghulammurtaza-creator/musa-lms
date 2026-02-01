@@ -9,7 +9,7 @@ from app.schemas.schemas import FamilyCreate, FamilyUpdate, FamilyResponse
 router = APIRouter(prefix="/families", tags=["Families"])
 
 
-@router.post("/", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED)
 async def create_family(
     family_data: FamilyCreate,
     db: AsyncSession = Depends(get_db)
@@ -31,7 +31,7 @@ async def create_family(
     return family
 
 
-@router.get("/", response_model=List[FamilyResponse])
+@router.get("", response_model=List[FamilyResponse])
 async def get_all_families(
     skip: int = 0,
     limit: int = 100,
