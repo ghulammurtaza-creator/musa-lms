@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const ScheduleClassForm = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [formData, setFormData] = useState({
     teacher_email: '',
     student_emails: [''],
@@ -18,6 +18,34 @@ const ScheduleClassForm = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+  const [myStudents, setMyStudents] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
+  // Fetch tutor's assigned students
+  useEffect(() => {
+    const fetchMyStudents = async () => {
+      if (!token || !user) return;
+      
+      setLoadingStudents(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/relationships/my-students`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setMyStudents(data);
+        }
+      } catch (err) {
+        console.error('Error fetching students:', err);
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    fetchMyStudents();
+  }, [token, user]);
 
   // Auto-fill teacher email from authenticated user
   useEffect(() => {
@@ -172,35 +200,62 @@ const ScheduleClassForm = () => {
               <Users className="w-4 h-4" />
               Student Emails
             </label>
-            {formData.student_emails.map((email, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <input
-                  type="email"
-                  required
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="student@email.com"
-                  value={email}
-                  onChange={(e) => updateStudentEmail(index, e.target.value)}
-                />
-                {formData.student_emails.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeStudentEmail(index)}
-                    className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+            {loadingStudents ? (
+              <div className="text-sm text-gray-500">Loading students...</div>
+            ) : (
+              <>
+                {formData.student_emails.map((email, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    {myStudents.length > 0 ? (
+                      <select
+                        required
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={email}
+                        onChange={(e) => updateStudentEmail(index, e.target.value)}
+                      >
+                        <option value="">Select a student</option>
+                        {myStudents.map((student) => (
+                          <option key={student.id} value={student.email}>
+                            {student.full_name} ({student.email})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="email"
+                        required
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="student@email.com"
+                        value={email}
+                        onChange={(e) => updateStudentEmail(index, e.target.value)}
+                      />
+                    )}
+                    {formData.student_emails.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeStudentEmail(index)}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addStudentEmail}
+                  className="mt-2 flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Another Student
+                </button>
+                {myStudents.length === 0 && !loadingStudents && (
+                  <p className="text-sm text-amber-600 mt-2">
+                    No assigned students found. You can still enter email addresses manually.
+                  </p>
                 )}
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addStudentEmail}
-              className="mt-2 flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Add Another Student
-            </button>
+              </>
+            )}
           </div>
 
           {/* Date and Time */}
